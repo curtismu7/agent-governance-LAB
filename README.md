@@ -18,7 +18,7 @@ What it shows:
 
 1. **Inventory (AI Platform Agents, slide 45, ENHANCED and GA).** Thirteen sources, 23 agents at the first scan (29 once everything is found), fake ids and `.example` hosts. A dashboard (recently discovered, action required, orphaned, platform filters) and per-agent detail ("deep agent anatomy": identity, model, configuration, tools, knowledge bases, guardrails, credentials, bindings, sub-agents; A2A agent cards on Google Agent Registry agents). AWS Organizations accounts are enumerated and onboarded by organizational unit. The slide 21 availability table is here, with every GA, Roadmap (Q4 2026) and Planned item tagged.
 2. **Permission review.** Each execution identity is read against its provider's permission surface. A five-level score is built from the lab's own 13 findings. The deck says Ping builds it from 46 findings: those are Ping's, not claimed, and the deck itself lists Risk Scoring as Planned on slide 21: the discrepancy is shown, not resolved.
-3. **Ownership.** Custodians, orphans, and every custodian action as a three-step machine: propose, a tenant administrator approves or denies (never the proposer, never a custodian), then execute. Self-approval, approve-after-deny, double approval, execute before approval and stale approvals are refused, and the audit log names the acting user. Remediation (delete on twelve of thirteen sources, quarantine on nine, strip a role, stop a flow, disable a credential, retag, reconfigure), succession and a certification campaign.
+3. **Ownership.** Custodians, orphans, and every custodian action as a three-step machine: propose, a tenant administrator approves or denies (never the proposer, never a custodian), then execute. Self-approval, approve-after-deny, double approval, execute before approval and stale approvals are refused, and the audit log names the acting user. Remediation (delete on twelve of thirteen sources, quarantine on the seven sources the deck names, strip a role, stop a flow, disable a credential, retag, reconfigure), succession and a certification campaign.
 4. **Safe sync.** A sync has one part per provider and scope. A partial failure deletes nothing and marks unseen agents unknown, never gone; you can inject failures and play the cloud console.
 5. **AgentCore gateway.** Enable or disable a tool target, switch the WAF failure mode, close a bypass route (with a before and after bypass diff), pin an endpoint, end a session, flip log-only to enforcing behind a typed confirmation. A twelve-check scorecard. The nine `modelAgentCoreAccountMetadata` fields.
 6. **Private network.** Tenant setting, connections (Enabled is fixed once added), a connector that only dials out, and findings that carry where the scanner runs.
@@ -30,7 +30,7 @@ What it shows:
 Each field is tagged in the app as "deck claim", "console swagger name (schema only)", "lab reading" or "lab-invented". The main ones:
 
 - **The deck's numbers are the deck's.** 13 sources, 46 findings, 5 levels (slide 45). The lab ships 13 sources, **its own 13 illustrative findings** (`LF-01` to `LF-13`, each a real rule over the seeded data with a test that it fires and a near-miss that does not), and **a lab-invented scoring rule** (points summed, capped at 100, mapped to five levels).
-- **Quarantine on "nine".** Slide 45 says nine and names seven (Bedrock Agents and AgentCore, Lex, Vertex AI, Copilot Studio, Agentforce, Snowflake Cortex). The other two (Google Agent Builder, Azure AI Foundry) are lab reading placeholders.
+- **Quarantine on "nine".** Slide 45 says nine (deck claim) and names seven (Bedrock Agents and AgentCore, Lex, Vertex AI, Copilot Studio, Agentforce, Snowflake Cortex). The deck says nine but names seven; the other two are not named, so the lab models seven (lab reading). Quarantine is refused, with that reason, on every other source, including Google Agent Builder and Azure AI Foundry. Delete stays on twelve of thirteen (Databricks excluded).
 - **Safe sync.** The slide 45 line about what a run does after a partial failure is partly cut off in the PDF. The lab's rule (nothing deleted, unseen agents unknown) is a **lab reading of a partly-cut-off deck line**, not the deck's words.
 - **The custodian approval machine** (propose, approve or deny, execute; the roles; stale approvals) is the lab's reading of "every custodian action requires approval from a tenant administrator before it executes".
 - **Succession and certification campaigns** are described on slides 18, 19 and 58 without an availability tag: "described in the deck, availability not stated".
@@ -114,7 +114,7 @@ npm test    # server (node --test), web (vitest, drives the UI against the real 
 
 The shared checks are run by hand, because the scripts are not shipped into this repo's CI: `bash <AI-DEMO-Standalone>/scripts/check-drift.sh .`, `bash <AI-DEMO-Standalone>/scripts/check-css.sh .` and `node <demo-kit-base>/scripts/conformance.mjs . --new`. Conformance warns on rule 18 on purpose: the deferred SE k8s manifests.
 
-On Node 26: 229 tests pass (175 server, 31 web, 23 scripts).
+On Node 26: 230 tests pass (176 server, 31 web, 23 scripts).
 
 ## Troubleshooting
 
@@ -133,4 +133,4 @@ On Node 26: 229 tests pass (175 server, 31 web, 23 scripts).
 
 ## Not done
 
-No SE k8s build (deferred by the owner, 2026-10-31). Every product claim stays UNVERIFIED until it is measured on a tenant that has the release. The two quarantine placeholders, the cut-off safe-sync line, the Risk Scoring discrepancy and the gateway JSON shapes remain open questions the deck and the schema do not answer.
+No SE k8s build (deferred by the owner, 2026-10-31). Every product claim stays UNVERIFIED until it is measured on a tenant that has the release. The two unnamed quarantine sources (the lab models seven, not nine), the cut-off safe-sync line, the Risk Scoring discrepancy and the gateway JSON shapes remain open questions the deck and the schema do not answer.

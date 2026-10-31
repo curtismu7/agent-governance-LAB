@@ -41,7 +41,7 @@ export async function runChecks({ env = process.env, table = MOCK_TABLE } = {}) 
 
   const nSources = Object.keys(SOURCE).length;
   const del = SOURCES.filter((x) => x.delete).length; const quar = SOURCES.filter((x) => x.quarantine).length;
-  add('catalog', nSources === 13 && del === 12 && quar === 9 && SOURCES.every((x) => x.type) ? 'pass' : 'fail', `${nSources} sources, delete on ${del}, quarantine on ${quar} (the deck says 13, 12 and 9)`);
+  add('catalog', nSources === 13 && del === 12 && quar === 7 && SOURCES.every((x) => x.type) ? 'pass' : 'fail', `${nSources} sources, delete on ${del}, quarantine on ${quar} (the deck says 13, 12 and nine, but names seven for quarantine: the lab models seven)`);
   add('findings', FINDINGS.length >= 12 && new Set(FINDINGS.map((f) => f.id)).size === FINDINGS.length ? 'pass' : 'fail', `${FINDINGS.length} lab-written findings (the deck's 46 are Ping's, not claimed)`);
 
   // Each scripted step gives the result the story says it does, in every vertical, and the Mock table agrees with the engine.

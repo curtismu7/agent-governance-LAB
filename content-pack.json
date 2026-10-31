@@ -74,7 +74,7 @@
     {
       "id": "remediation",
       "term": "Remediation",
-      "definition": "Delete on twelve of thirteen sources (Databricks is in development) and quarantine on nine (the slide names seven; the other two are lab reading placeholders), plus targeted fixes: strip an over-privileged role, stop a privileged flow, disable a named credential, retag or reconfigure. Ping release claim, UNVERIFIED on our tenant.",
+      "definition": "Delete on twelve of thirteen sources (Databricks is in development) and quarantine on nine (deck claim; the deck says nine but names seven, the other two are not named, so the lab models seven: lab reading), plus targeted fixes: strip an over-privileged role, stop a privileged flow, disable a named credential, retag or reconfigure. Ping release claim, UNVERIFIED on our tenant.",
       "aliases": [
         "delete",
         "quarantine"

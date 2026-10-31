@@ -5,23 +5,24 @@ import { fill } from './cast.js';
 
 // The thirteen sources, in the deck's order. `type` is the console swagger enum value of imodelAIAgentAccountSpec.Type (schema only).
 // delete: the deck says "delete on twelve of thirteen sources (Databricks in development)". quarantine: the deck says "nine" and NAMES seven
-// (Bedrock Agents and AgentCore, Lex, Vertex AI, Copilot Studio, Agentforce, Snowflake Cortex); the other two are a LAB READING (placeholders).
+// (Bedrock Agents and AgentCore, Lex, Vertex AI, Copilot Studio, Agentforce, Snowflake Cortex). The other two are not named, so the lab does not guess:
+// quarantine is modelled on exactly the seven named (deck claim: nine; lab reading: seven).
 // permissionSurface: slide 45 names AWS IAM policies, Google project IAM bindings, Azure ARM role assignments, named credentials (Agentforce) and
 // privileged flows (Copilot Studio); Databricks and Snowflake are not named, so theirs is a lab reading.
 export const SOURCES = [
-  { id: 'bedrock', name: 'AWS Bedrock Agents', cloud: 'aws', type: 'BEDROCK', surface: 'AWS IAM policies', surfaceSource: 'deck', delete: true, quarantine: true, quarantineSource: 'deck' },
-  { id: 'agentcore', name: 'AWS Bedrock AgentCore', cloud: 'aws', type: 'AGENTCORE', surface: 'AWS IAM policies', surfaceSource: 'deck', delete: true, quarantine: true, quarantineSource: 'deck' },
-  { id: 'lex', name: 'Amazon Lex', cloud: 'aws', type: 'LEX', surface: 'AWS IAM policies', surfaceSource: 'deck', delete: true, quarantine: true, quarantineSource: 'deck' },
-  { id: 'bedrockflow', name: 'Amazon Bedrock Flows', cloud: 'aws', type: 'BEDROCKFLOW', surface: 'AWS IAM policies', surfaceSource: 'deck', delete: true, quarantine: false, quarantineSource: 'deck' },
-  { id: 'vertexai', name: 'Google Vertex AI Agent Engine', cloud: 'gcp', type: 'VERTEXAI', surface: 'Google project IAM bindings', surfaceSource: 'deck', delete: true, quarantine: true, quarantineSource: 'deck' },
-  { id: 'agentbuilder', name: 'Google Agent Builder', cloud: 'gcp', type: 'AGENTBUILDER', surface: 'Google project IAM bindings', surfaceSource: 'deck', delete: true, quarantine: true, quarantineSource: 'reading' },
-  { id: 'agentregistry', name: 'Google Agent Registry', cloud: 'gcp', type: 'AGENTREGISTRY', surface: 'Google project IAM bindings', surfaceSource: 'deck', delete: true, quarantine: false, quarantineSource: 'deck' },
-  { id: 'dialogflowcx', name: 'Dialogflow CX', cloud: 'gcp', type: 'DIALOGFLOWCX', surface: 'Google project IAM bindings', surfaceSource: 'deck', delete: true, quarantine: false, quarantineSource: 'deck' },
-  { id: 'aifoundry', name: 'Azure AI Foundry', cloud: 'azure', type: 'AIFOUNDRY', surface: 'Azure ARM role assignments', surfaceSource: 'deck', delete: true, quarantine: true, quarantineSource: 'reading' },
-  { id: 'copilot', name: 'Microsoft Copilot Studio', cloud: 'azure', type: 'COPILOT', surface: 'Privileged flows', surfaceSource: 'deck', delete: true, quarantine: true, quarantineSource: 'deck' },
-  { id: 'agentforce', name: 'Salesforce Agentforce', cloud: 'saas', type: 'AGENTFORCE', surface: 'Named credentials', surfaceSource: 'deck', delete: true, quarantine: true, quarantineSource: 'deck' },
-  { id: 'databricks', name: 'Databricks Mosaic AI', cloud: 'saas', type: 'DATABRICKS', surface: 'Workspace grants', surfaceSource: 'reading', delete: false, quarantine: false, quarantineSource: 'deck' },
-  { id: 'snowflake', name: 'Snowflake Cortex AI', cloud: 'saas', type: 'SNOWFLAKE_CORTEX', surface: 'Role grants', surfaceSource: 'reading', delete: true, quarantine: true, quarantineSource: 'deck' },
+  { id: 'bedrock', name: 'AWS Bedrock Agents', cloud: 'aws', type: 'BEDROCK', surface: 'AWS IAM policies', surfaceSource: 'deck', delete: true, quarantine: true },
+  { id: 'agentcore', name: 'AWS Bedrock AgentCore', cloud: 'aws', type: 'AGENTCORE', surface: 'AWS IAM policies', surfaceSource: 'deck', delete: true, quarantine: true },
+  { id: 'lex', name: 'Amazon Lex', cloud: 'aws', type: 'LEX', surface: 'AWS IAM policies', surfaceSource: 'deck', delete: true, quarantine: true },
+  { id: 'bedrockflow', name: 'Amazon Bedrock Flows', cloud: 'aws', type: 'BEDROCKFLOW', surface: 'AWS IAM policies', surfaceSource: 'deck', delete: true, quarantine: false },
+  { id: 'vertexai', name: 'Google Vertex AI Agent Engine', cloud: 'gcp', type: 'VERTEXAI', surface: 'Google project IAM bindings', surfaceSource: 'deck', delete: true, quarantine: true },
+  { id: 'agentbuilder', name: 'Google Agent Builder', cloud: 'gcp', type: 'AGENTBUILDER', surface: 'Google project IAM bindings', surfaceSource: 'deck', delete: true, quarantine: false },
+  { id: 'agentregistry', name: 'Google Agent Registry', cloud: 'gcp', type: 'AGENTREGISTRY', surface: 'Google project IAM bindings', surfaceSource: 'deck', delete: true, quarantine: false },
+  { id: 'dialogflowcx', name: 'Dialogflow CX', cloud: 'gcp', type: 'DIALOGFLOWCX', surface: 'Google project IAM bindings', surfaceSource: 'deck', delete: true, quarantine: false },
+  { id: 'aifoundry', name: 'Azure AI Foundry', cloud: 'azure', type: 'AIFOUNDRY', surface: 'Azure ARM role assignments', surfaceSource: 'deck', delete: true, quarantine: false },
+  { id: 'copilot', name: 'Microsoft Copilot Studio', cloud: 'azure', type: 'COPILOT', surface: 'Privileged flows', surfaceSource: 'deck', delete: true, quarantine: true },
+  { id: 'agentforce', name: 'Salesforce Agentforce', cloud: 'saas', type: 'AGENTFORCE', surface: 'Named credentials', surfaceSource: 'deck', delete: true, quarantine: true },
+  { id: 'databricks', name: 'Databricks Mosaic AI', cloud: 'saas', type: 'DATABRICKS', surface: 'Workspace grants', surfaceSource: 'reading', delete: false, quarantine: false },
+  { id: 'snowflake', name: 'Snowflake Cortex AI', cloud: 'saas', type: 'SNOWFLAKE_CORTEX', surface: 'Role grants', surfaceSource: 'reading', delete: true, quarantine: true },
 ];
 export const SOURCE_IDS = SOURCES.map((s) => s.id);
 export const SOURCE = Object.fromEntries(SOURCES.map((s) => [s.id, s]));

@@ -94,7 +94,7 @@ test('README sections follow the standard order (Troubleshooting, Ownership, Not
   assert.deepEqual([...order].sort((a, b) => a - b), order, 'sections are in order');
   assert.match(r, /### Known limits of the model/);
   assert.match(r, /lab-invented/i);
-  assert.match(r, /run by hand/); assert.match(r, /lab-invented \(the schema gives only the field name\)/); assert.match(r, /lab reading of a partly-cut-off deck line/); assert.match(r, /Risk Scoring/); assert.match(r, /names seven/); assert.match(r, /described in the deck, availability not stated/); assert.match(r, /Roadmap \(Q4 2026\)/);
+  assert.match(r, /run by hand/); assert.match(r, /lab-invented \(the schema gives only the field name\)/); assert.match(r, /lab reading of a partly-cut-off deck line/); assert.match(r, /Risk Scoring/); assert.match(r, /names seven/); assert.match(r, /the deck says nine but names seven; the other two are not named, so the lab models seven/i); assert.match(read('docs/safety.md'), /the deck says nine but names seven; the other two are not named, so the lab models seven/); assert.match(read('content-pack.json'), /the deck says nine but names seven, the other two are not named, so the lab models seven/); assert.match(r, /described in the deck, availability not stated/); assert.match(r, /Roadmap \(Q4 2026\)/);
   assert.match(r, /util\.parseEnv/);
 });
 

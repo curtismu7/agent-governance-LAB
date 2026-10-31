@@ -97,11 +97,11 @@ export default function OwnershipTab({ story, lab, actor }) {
       </section>
 
       <section className="panel" aria-label="Remediation" data-testid="remediation">
-        <h3 className="panel__sub">Remediation by source <SourceTag source="deck" /></h3>
-        <p className="muted">The deck says delete works on twelve of thirteen sources (Databricks is in development) and quarantine on nine, naming seven. The other two are lab reading placeholders. Targeted fixes (strip a role, stop a flow, disable a credential, retag, reconfigure) are named on slide 45; their effect on the score is lab-invented.</p>
+        <h3 className="panel__sub">Remediation by source <SourceTag source="deck" label="deck claim: delete on 12, quarantine on nine" /> <SourceTag source="reading" label="lab reading: the deck names seven, the lab models seven" /></h3>
+        <p className="muted">The deck says delete works on twelve of thirteen sources (Databricks is in development) and quarantine on nine (deck claim) but names seven: the other two are not named, so the lab models seven (lab reading), and refuses quarantine on every other source. Targeted fixes (strip a role, stop a flow, disable a credential, retag, reconfigure) are named on slide 45; their effect on the score is lab-invented.</p>
         <div className="scroll"><table className="tbl">
           <thead><tr><th>Source</th><th>Delete</th><th>Quarantine</th></tr></thead>
-          <tbody>{story.sources.map((x) => <tr key={x.id}><td>{x.name}</td><td>{x.delete ? "yes" : "no (in development)"}</td><td>{x.quarantine ? (x.quarantineNamedByDeck ? "yes (named by the deck)" : "yes (lab reading placeholder)") : "no"}</td></tr>)}</tbody>
+          <tbody>{story.sources.map((x) => <tr key={x.id}><td>{x.name}</td><td>{x.delete ? "yes" : "no (in development)"}</td><td>{x.quarantine ? "yes (named by the deck)" : "no (not named by the deck: refused)"}</td></tr>)}</tbody>
         </table></div>
       </section>
 

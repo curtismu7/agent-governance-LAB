@@ -24,7 +24,7 @@ An orphaned agent is flagged. maya.chen proposes quarantining an agent. Nobody a
 
 ## Remediation that follows the source
 
-Delete works on twelve sources and not on Databricks, which the deck says is in development. Quarantine works on nine. Beside them are targeted fixes: strip a role, stop a privileged flow, disable a named credential, retag or reconfigure, and the score drops because the rule no longer fires.
+Delete works on twelve sources and not on Databricks, which the deck says is in development. Quarantine works on the sources the deck names: the deck says nine but names seven, and the other two are not named, so the lab models seven. Beside them are targeted fixes: strip a role, stop a privileged flow, disable a named credential, retag or reconfigure, and the score drops because the rule no longer fires.
 
 ## Succession and certification
 
@@ -49,7 +49,7 @@ Challenge: Agents created in cloud consoles sit outside identity processes: nobo
 ## What the deck leaves unresolved (shown, not resolved)
 
 - **Risk scoring: slide 45 vs slide 21.** Slide 45 describes a five-level risk score built from 46 findings as part of AI Platform Agents (ENHANCED, GA). Slide 21 lists "Risk Scoring" (outlier detection based on risky access and anomalous behaviour) as Planned. The deck does not say how the two relate: they may be different things (a finding-based score versus outlier detection), or the score may be only partly shipped. The lab does not resolve this: it shows a finding-based score, tags it, and claims nothing about outlier detection.
-- **Quarantine: "nine" sources, seven names.** Slide 45 says quarantine works on nine sources and names seven (Bedrock Agents and AgentCore, Lex, Vertex AI, Copilot Studio, Agentforce, Snowflake Cortex). The other two are not named. The lab supports quarantine on the seven named and, as a placeholder lab reading, on Google Agent Builder and Azure AI Foundry to make nine; those two are tagged lab reading.
+- **Quarantine: "nine" sources, seven names.** Slide 45 says quarantine works on nine sources and names seven (Bedrock Agents and AgentCore, Lex, Vertex AI, Copilot Studio, Agentforce, Snowflake Cortex). The other two are not named. The deck says nine but names seven; the other two are not named, so the lab models seven (lab reading). Quarantine is refused, with that reason, on every other source, including Google Agent Builder and Azure AI Foundry.
 - **Safe sync: the line is cut off in the PDF.** The slide 45 sentence about what a run does after a partial failure is partly hidden in the PDF. The lab implements the safe behaviour (nothing is deleted; agents not seen are marked unknown, never gone) and labels it "lab reading of a partly-cut-off deck line", not the deck's words.
 - **Slide 35 vs 57 naming.** Slide 35 retires "Workload Agent Discovery & Control" in favour of "AI Platform Agents"; this lab follows slide 35.
 
@@ -84,7 +84,7 @@ Challenge: Agents created in cloud consoles sit outside identity processes: nobo
 - Anything about how the real console, a real cloud, a real provider API or a Workload Connector behaves: nothing here ran against one. The provider calls shown are illustrations on .example hosts that are never sent.
 - Ping's 46 findings: the deck does not list them. The lab's 13 findings and its scoring rule are its own.
 - How the deck's five-level score is computed, and whether it is the same thing as the Planned "Risk Scoring" on slide 21.
-- Which two sources besides the seven named make up the "nine" that support quarantine (placeholders here).
+- Which two sources besides the seven named make up the deck's "nine" for quarantine: the deck does not name them, so the lab models seven and refuses quarantine elsewhere.
 - What the product does after a partial sync failure (the slide line is cut off); the lab's safe behaviour is a lab reading.
 - Activity Collectors, Shadow AI Discovery, Agent Lifecycle Management, rule-based classification and custodian assignment, Agent Events and Access Visualization: not modelled.
 - Slide 58's "policies flag conflicting access with preventative and detective scans" and "activity monitoring": not modelled.

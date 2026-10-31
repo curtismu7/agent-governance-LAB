@@ -17,7 +17,7 @@ test('both banners say SIMULATED, name their mode, carry the unverified label an
   assert.match(BANNER.live, /loopback only, zero outbound network/);
 });
 
-test('every claim names its slide; the numbers are the deck\'s (13 sources, 12 delete, 9 quarantine, 46 findings, 5 levels) and the lab\'s are labelled the lab\'s', () => {
+test('every claim names its slide; the numbers are the deck\'s (13 sources, 12 delete, 7 quarantine (deck says nine, names seven), 46 findings, 5 levels) and the lab\'s are labelled the lab\'s', () => {
   for (const c of CLAIMS) assert.ok(Number.isInteger(c.slide) && c.claim.length > 40, c.id);
   assert.ok(CLAIMS.find((c) => c.id === 'sources').claim.includes('Thirteen sources'));
   assert.ok(CLAIMS.find((c) => c.id === 'remediation').claim.includes('twelve of thirteen'));
@@ -73,8 +73,11 @@ test('no shipped text says "door", names a real customer, holds a credential or 
 });
 
 test('the story carries the catalog the page renders: 13 sources with delete and quarantine flags, 13 findings, 5 levels, scorecard checks', () => {
-  assert.equal(s.sources.filter((x) => x.delete).length, 12); assert.equal(s.sources.filter((x) => x.quarantine).length, 9);
-  assert.deepEqual(s.sources.filter((x) => x.quarantine && !x.quarantineNamedByDeck).map((x) => x.id).sort(), ['agentbuilder', 'aifoundry']);
+  assert.equal(s.sources.filter((x) => x.delete).length, 12); assert.equal(s.sources.filter((x) => x.quarantine).length, 7);
+  assert.deepEqual(s.sources.filter((x) => x.quarantine && !x.quarantineNamedByDeck), []);
+  assert.ok(FIELD_SOURCES.some((f) => f.source === 'reading' && /deck says nine but names seven; the other two are not named, so the lab models seven/.test(f.note)));
+  assert.ok(FIELD_SOURCES.some((f) => f.source === 'deck' && /quarantine on nine/.test(f.field)));
+  assert.match(DISCREPANCIES.find((d) => d.id === 'nine').text, /the lab models seven/);
   assert.equal(s.levels.length, 5); assert.equal(s.scorecardChecks.length, 12); assert.equal(s.scenarios.length, 8);
 });
 

@@ -233,6 +233,11 @@ describe("Ownership (Live): propose, approve, execute, and the refusals", () => 
     await click("propose");
     await waitFor(() => expect(screen.getByTestId("last-action")).toHaveTextContent(/refused \(unsupported_on_source\)/), T);
     expect(screen.getByTestId("remediation")).toHaveTextContent(/no \(in development\)/);
+    expect(screen.getByTestId("remediation")).toHaveTextContent(/the deck says nine|names seven/);
+    const rows = within(screen.getByTestId("remediation")).getAllByRole("row");
+    expect(rows.filter((r) => /yes \(named by the deck\)/.test(r.textContent)).length).toBe(7);
+    expect(rows.find((r) => /Google Agent Builder/.test(r.textContent))).toHaveTextContent(/not named by the deck: refused/);
+    expect(rows.find((r) => /Azure AI Foundry/.test(r.textContent))).toHaveTextContent(/not named by the deck: refused/);
   }, 60000);
 
   it("a credential typed as the reason or a tag value is masked everywhere on the page and in the hops", async () => {

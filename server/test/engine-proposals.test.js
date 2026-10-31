@@ -123,7 +123,7 @@ test('DELETE works on twelve of thirteen sources and is refused on Databricks (i
   assert.equal(agentOf(e, bySource.get('snowflake').id).status, 'deleted'); assert.ok(!e.snapshot().provider.present.includes(bySource.get('snowflake').id));
 });
 
-test('QUARANTINE works on exactly nine sources (seven named by the deck, two lab-reading placeholders) and is refused elsewhere; a repeat is refused', () => {
+test('QUARANTINE works on exactly the seven sources the deck names; the deck says nine but names seven, so the lab models seven; a repeat is refused', () => {
   const e = newEngine(); discoverAll(e);
   const bySource = new Map();
   for (const a of e.snapshot().agents) if (!bySource.has(a.source) && a.status === 'active') bySource.set(a.source, a);
@@ -132,13 +132,22 @@ test('QUARANTINE works on exactly nine sources (seven named by the deck, two lab
     const code = codeOf(() => prop(e, A, a.id, 'quarantine'));
     if (code === null) supported.push(source); else assert.equal(code, 'unsupported_on_source', source);
   }
-  assert.equal(supported.length, 9);
-  assert.deepEqual(QUARANTINE_NAMED_BY_DECK.filter((s) => !supported.includes(s)), [], 'every source the deck names is supported');
-  assert.deepEqual(supported.filter((s) => !QUARANTINE_NAMED_BY_DECK.includes(s)).sort(), ['agentbuilder', 'aifoundry'], 'the two placeholders');
+  assert.equal(supported.length, 7);
+  assert.deepEqual([...supported].sort(), [...QUARANTINE_NAMED_BY_DECK].sort(), 'exactly the seven the deck names');
   assert.deepEqual(SOURCES.filter((s) => s.quarantine).map((s) => s.id).sort(), [...supported].sort());
-  assert.equal(SOURCES.filter((s) => s.quarantineSource === 'reading').length, 2);
   const e2 = newEngine(); remediate(e2, A, 'ag-bedrock-01', 'quarantine');
   assert.equal(codeOf(() => prop(e2, A, 'ag-bedrock-01', 'quarantine')), 'already_in_state');
+});
+
+test('Google Agent Builder and Azure AI Foundry refuse quarantine, with a clear reason that says the deck names seven of nine', () => {
+  const e = newEngine();
+  for (const id of ['ag-agentbuilder-01', 'ag-aifoundry-01']) {
+    assert.equal(codeOf(() => prop(e, A, id, 'quarantine')), 'unsupported_on_source', id);
+    try { prop(e, A, id, 'quarantine'); assert.fail('should refuse'); } catch (err) { assert.match(err.message, /the deck says nine sources but names seven/); assert.match(err.message, /the lab models seven/); assert.equal(err.status, 409); }
+    assert.equal(agentOf(e, id).quarantined, false);
+  }
+  assert.equal(e.snapshot().proposals.length, 0, 'nothing was proposed');
+  assert.ok(codeOf(() => prop(e, A, 'ag-agentbuilder-01', 'delete')) === null, 'delete still works on Agent Builder');
 });
 
 test('QUARANTINE is real: the identity is detached, so the findings that depended on its reach stop, and the others stay', () => {
