@@ -20,7 +20,7 @@ Each agent's execution identity is read against its provider. The deck says Ping
 
 ## Every agent has a custodian, and every action is approved
 
-An orphaned agent is flagged. maya.chen proposes quarantining an agent. Nobody approves their own proposal and a custodian cannot approve at all: only a tenant administrator can, and never the proposer. priya.nair approves, then it runs, and the audit log names who did each step. Stale approvals are refused if the agent changed in between.
+An orphaned agent is flagged. maya.chen proposes quarantining an agent. Nobody approves their own proposal and a custodian cannot approve at all: only a tenant administrator can. priya.nair approves, then it runs, and the audit log names who did each step. An administrator's own action runs immediately (the deck says only administrators act immediately), still audited with their name. Stale approvals are refused if the agent changed in between.
 
 ## Remediation that follows the source
 
@@ -57,7 +57,7 @@ Challenge: Agents created in cloud consoles sit outside identity processes: nobo
 
 - **Platform Agent Discovery** (GA): Modelled: the thirteen-source inventory and the safe sync.
 - **Activity Collectors** (GA): Not modelled.
-- **Agent Delegated Administration** (GA): Modelled as a lab reading: custodian operations limited to administrators and the agent's custodian, with approval by a different administrator.
+- **Agent Delegated Administration** (GA): Modelled as a lab reading: custodian operations limited to administrators and the agent's custodian; an administrator's own action runs immediately (slide 45: only administrators act immediately), a custodian's action needs an administrator's approval (slide 45). Every action is audited with the acting user, which is self-declared in this lab.
 - **Shadow AI Discovery with Agent Privilege** (Roadmap (Q4 2026)): Not modelled. No behaviour is claimed.
 - **Agent Lifecycle Management** (Roadmap (Q4 2026)): Not modelled. No behaviour is claimed. (Delete and quarantine here are the slide 45 remediation, not lifecycle management.)
 - **Agent Classification** (Roadmap (Q4 2026)): No behaviour is claimed. The lab only reads an owner hint at discovery to name a custodian (lab reading of slide 19, not rule-based classification).
@@ -72,12 +72,12 @@ Challenge: Agents created in cloud consoles sit outside identity processes: nobo
 
 1. **The first scan: one inventory across thirteen sources.** Twenty-three agents are discovered across AWS, Google, Azure and three SaaS platforms (three more sit behind a private network or in an organizational unit that is not onboarded yet). Some have no custodian, some are public and unauthenticated, some hold administrator grants.
 2. **A second scan finds new agents and a new account.** Between scans, agents are created in cloud consoles and a new AWS account appears in an onboarded organizational unit. The next sync discovers them. Onboarding the sandbox OU brings its account in at the following sync.
-3. **A custodian proposes, an administrator approves, then it runs.** Every custodian action needs approval from a tenant administrator before it executes. Self-approval, a custodian approving, approving too early and an unsupported delete are all refused, and the audit log names the acting user each time.
+3. **A custodian proposes, an administrator approves, then it runs.** A custodian's action needs approval from a tenant administrator before it executes; an administrator's own action runs at once, audited with the acting user. Self-approval, another custodian approving, approving too early and an unsupported delete are refused, and the audit log names the acting user each time.
 4. **Targeted fixes bring the score down.** Strip an unused write role, stop a privileged flow, disable a named credential, close a public endpoint. Each is proposed by the custodian, approved by an administrator and executed; the finding that fired stops firing.
 5. **A provider does not answer: nothing is deleted.** An agent is really deleted in a console while one provider is down. The partial run deletes nothing and marks every agent it could not see as unknown, never gone. A clean run afterwards marks the really removed agent as gone and recovers the rest.
 6. **Governing the gateway itself.** Flip log-only to enforcing: a wrong typed confirmation changes nothing, the gateway name does. Close a bypass route and see who was reachable only through it. Disable a target, fail the WAF closed, pin the endpoint, end a session. The scorecard of twelve checks moves each time.
 7. **Agents inside your own network.** A tenant that has not enabled Private network cannot add a connection. Enable it, add a connection whose scanner runs in an AWS account, find that Enabled is fixed once added, let the connector poll outbound, and the next sync discovers the private agents, each carrying where the scanner runs.
-8. **A custodian leaves; a certification campaign runs.** When a custodian leaves, a transfer is proposed for each agent and an administrator approves each. A campaign asks each custodian to certify or revoke; a revoke goes through approval; unreviewed items escalate to an administrator.
+8. **A custodian leaves; a certification campaign runs.** When a custodian leaves, a transfer is proposed for each agent and an administrator approves each (a lab reading, not the deck). A campaign asks each custodian to certify or revoke; a revoke goes through approval; unreviewed items escalate to an administrator.
 
 ## Not demonstrated
 

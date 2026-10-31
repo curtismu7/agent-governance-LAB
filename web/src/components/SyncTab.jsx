@@ -58,6 +58,7 @@ export default function SyncTab({ story, lab, actor }) {
 
       <section className="panel" aria-label="Run history">
         <h3 className="panel__sub">Runs ({runs.length})</h3>
+        <p className="muted" data-testid="runs-note">The list keeps the newest {story.limits.runs} runs; {s.auditInfo.runsDropped} older ones have been dropped from it (the audit log keeps one entry per sync).</p>
         <div className="scroll"><table className="tbl" data-testid="runs">
           <thead><tr><th>Run</th><th>By</th><th>Outcome</th><th>New</th><th>Gone</th><th>Unknown</th></tr></thead>
           <tbody>{runs.map((r) => <tr key={r.id}><td>{r.id}</td><td>{visible(r.by)}</td><td><StatusTag status={r.outcome} /></td><td>{r.discovered.length}</td><td>{r.gone.length}</td><td>{r.unknown.length}</td></tr>)}</tbody>

@@ -69,7 +69,7 @@ export function scorecard(gw) {
   return { gateway: gw.id, checks, greenCount: checks.filter((c) => c.green).length, total: checks.length };
 }
 
-// The nine modelAgentCoreAccountMetadata fields (names from the schema; shapes lab-invented). In the real schema each is a string of JSON text.
+// The nine newly added modelAgentCoreAccountMetadata fields (the 2026-10-26 to 2026-10-31 diff added them; the definition has 30 in all, 21 not modelled). Names from the schema; shapes lab-invented. In the real schema each is a string of JSON text.
 export function metadata(gateways, orphanEngines) {
   const m = {
     GatewayDetailJSON: gateways.map((g) => ({ gateway: g.id, name: g.name, status: g.status, authorizer: g.authorizer, policyEngine: { id: g.engine.id, mode: g.engine.mode, status: g.engine.status }, wafFailureMode: g.wafFailureMode, kmsKey: g.kmsKey, pinnedEndpoint: g.pinnedEndpoint, rateLimit: g.rateLimit })),
@@ -131,8 +131,9 @@ export function gatewayAction(e, gatewayId, a) {
   } else if (a.kind === 'pin-endpoint') {
     const host = (() => { try { const u = new URL(String(a.endpoint)); return u.protocol === 'https:' && !u.username && !u.password && u.pathname === '/' && !u.search && !u.hash && !u.port ? u.hostname : null; } catch { return null; } })();
     if (!isStr(a.endpoint, 120) || !host || !isReservedHost(host) || cleanFree(a.endpoint, 120) !== a.endpoint) throw refuse('bad_endpoint', 'endpoint must be an https URL on a .example or .invalid host, with no path, port or credentials');
-    if (g.pinnedEndpoint === `https://${host}`) throw refuse('already_in_state', 'that endpoint is already pinned', 409);
-    g.pinnedEndpoint = `https://${host}`; result = { pinnedEndpoint: g.pinnedEndpoint };
+    const clean = host.replace(/\.$/, '');
+    if (g.pinnedEndpoint === `https://${clean}`) throw refuse('already_in_state', 'that endpoint is already pinned', 409);
+    g.pinnedEndpoint = `https://${clean}`; result = { pinnedEndpoint: g.pinnedEndpoint };
   } else if (a.kind === 'end-session') {
     const i = typeof a.session === 'string' ? g.sessions.findIndex((x) => x.id === a.session) : -1;
     if (i < 0) throw refuse('unknown_session', 'no such session', 404);

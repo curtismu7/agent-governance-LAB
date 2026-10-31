@@ -60,7 +60,7 @@ export const FINDINGS = [
     const m = Object.hasOwn(MODELS, v.model) ? MODELS[v.model] : null;
     return m?.deprecated ? `model ${v.model} was retired ${m.retired}` : null;
   }),
-  F('LF-09', 'Orphaned agent (no custodian)', 'ownership', 15, 'No named custodian is assigned.', (v) => (v.custodian ? null : 'no custodian')),
+  F('LF-09', 'Orphaned agent (no custodian)', 'ownership', 15, 'No named custodian is assigned, or the assigned custodian has left.', (v, ctx) => (!v.custodian ? 'no custodian' : ctx.departed?.has(v.custodian) ? 'the custodian has left and no one has taken over' : null)),
   F('LF-10', 'Stale credential', 'hygiene', 10, `An enabled credential was last rotated more than ${STALE_CREDENTIAL_DAYS} days ago.`, (v) => {
     const c = v.creds.find((x) => x.rotatedDaysAgo > STALE_CREDENTIAL_DAYS);
     return c ? `credential ${c.name} rotated ${c.rotatedDaysAgo} days ago` : null;
@@ -77,12 +77,12 @@ export const FINDING_IDS = FINDINGS.map((f) => f.id);
 export const levelOf = (score) => [...LEVELS].reverse().find((l) => score >= l.min);
 
 // ctx is computed once per snapshot from the whole inventory: which identities are administrative, how many agents share an identity, which ids exist.
-export function buildContext(agents) {
+export function buildContext(agents, departed = new Set()) {
   const live = agents.filter((a) => a.status === 'active' || a.status === 'unknown');
   const adminIdentities = new Set(live.filter((a) => effective(a).perms.some((p) => p.class === 'admin') || effective(a).flows.some((f) => f.privileged)).map((a) => a.identity.name));
   const identityUse = {};
   for (const a of live) identityUse[a.identity.name] = (identityUse[a.identity.name] || 0) + 1;
-  return { adminIdentities, identityUse, knownIds: new Set(live.map((a) => a.id)) };
+  return { adminIdentities, identityUse, knownIds: new Set(live.map((a) => a.id)), departed };
 }
 
 export function assess(a, ctx) {

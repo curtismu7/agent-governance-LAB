@@ -1,7 +1,7 @@
 // These tests drive the real UI against the real Express app (started on a loopback port inside the test), so a green run means the pieces
 // actually work together: the real story data, the real engine, the real Mock table.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createApp, startHttpServer } from "../../server/src/app.js";
 import { createHealth } from "../../server/src/health.js";
@@ -13,7 +13,8 @@ import { forgetWorkspace } from "./workspace";
 
 const C = VERTICALS.finance;
 let server; let base; const realFetch = globalThis.fetch; let seen = [];
-let delay = () => 0;
+let gate = () => null; // a function (url) -> a promise to wait for before the request is sent, or null: the tests hold a request and release it deterministically
+let consumed = []; // urls whose response body the app has read
 beforeAll(async () => {
   const health = createHealth({ runChecks: async () => [], intervalMs: 3_600_000 });
   ({ server, url: base } = await startHttpServer({ port: 0, host: "127.0.0.1", app: createApp({ health, configFile: "/nonexistent/customer.config.json" }) }));
@@ -21,12 +22,15 @@ beforeAll(async () => {
   globalThis.fetch = async (u, init = {}) => {
     const url = typeof u === "string" && u.startsWith("/") ? `${base}${u}` : u;
     seen.push({ url: String(url), body: typeof init.body === "string" ? init.body : "" });
-    const ms = delay(String(url), init); if (ms) await new Promise((r) => setTimeout(r, ms));
-    return realFetch(url, { ...init, headers: { origin: base, ...(init.headers || {}) } });
+    const g = gate(String(url), init); if (g) await g;
+    const res = await realFetch(url, { ...init, headers: { origin: base, ...(init.headers || {}) } });
+    const json = res.json.bind(res);
+    res.json = async () => { const j = await json(); consumed.push(String(url)); return j; };
+    return res;
   };
 });
 afterAll(async () => { globalThis.fetch = realFetch; await new Promise((r) => server.close(r)); });
-beforeEach(() => { cleanup(); forgetWorkspace(); seen = []; delay = () => 0; try { window.localStorage.clear(); window.sessionStorage.clear(); } catch { /* ignore */ } window.location.hash = ""; });
+beforeEach(() => { cleanup(); forgetWorkspace(); seen = []; gate = () => null; consumed = []; try { window.localStorage.clear(); window.sessionStorage.clear(); } catch { /* ignore */ } window.location.hash = ""; });
 
 const T = { timeout: 20000 };
 const mount = async () => { render(<App />); await screen.findByTestId("scenarios", {}, T); };
@@ -190,13 +194,13 @@ describe("Permission review", () => {
 });
 
 describe("Ownership (Live): propose, approve, execute, and the refusals", () => {
-  it("a custodian proposes, cannot approve, an administrator approves, it executes, and the audit log names who did each step", async () => {
+  it("a custodian proposes, cannot approve their own, an administrator approves, it executes, and the audit log names who did each step", async () => {
     await mount(); await live();
     await proposeQuarantine("ag-bedrock-02", C.castCustodian);
     await waitFor(() => expect(screen.getByTestId("proposal-prop-0001")).toHaveTextContent(/proposed/), T);
     // the custodian tries to approve: refused
     await click("approve-prop-0001");
-    await waitFor(() => expect(screen.getByTestId("last-action")).toHaveTextContent(/refused \(admin_only\)/), T);
+    await waitFor(() => expect(screen.getByTestId("last-action")).toHaveTextContent(/refused \(self_approval\)/), T);
     expect(screen.getByTestId("proposal-prop-0001")).toHaveTextContent(/proposed/);
     // executing before approval is refused
     await actAs(C.castAdmin); await idle();
@@ -212,20 +216,24 @@ describe("Ownership (Live): propose, approve, execute, and the refusals", () => 
     expect(screen.getByTestId("agent-ag-bedrock-02")).toHaveTextContent(/quarantined/);
   }, 120000);
 
-  it("an administrator cannot approve their own proposal: the refusal is shown; the other administrator can", async () => {
+  it("an administrator acts immediately: their own proposal runs at once and is audited with their name; a custodian's waits and cannot be approved by the custodian", async () => {
     await mount(); await live();
     await proposeQuarantine("ag-bedrock-01", C.castAdmin);
-    await click("approve-prop-0001");
-    await waitFor(() => expect(screen.getByTestId("last-action")).toHaveTextContent(/refused \(self_approval\)/), T);
-    expect(screen.getByTestId("proposal-prop-0001")).toHaveTextContent(/proposed/);
-    await actAs(C.castAdmin2); await click("approve-prop-0001");
-    await waitFor(() => expect(screen.getByTestId("proposal-prop-0001")).toHaveTextContent(/approved/), T);
-    expect(screen.getByTestId("proposal-prop-0001")).toHaveTextContent(C.castAdmin2);
+    await waitFor(() => expect(screen.getByTestId("proposal-prop-0001")).toHaveTextContent(/executed/), T);
+    expect(screen.queryByTestId("approve-prop-0001")).toBeNull();
+    expect(screen.getByTestId("audit")).toHaveTextContent(/proposal.executed/);
+    expect(screen.getByTestId("audit")).toHaveTextContent(C.castAdmin);
+    await proposeQuarantine("ag-bedrock-02", C.castCustodian);
+    await waitFor(() => expect(screen.getByTestId("proposal-prop-0002")).toHaveTextContent(/proposed/), T);
+    await actAs(C.castAdmin2); await click("approve-prop-0002");
+    await waitFor(() => expect(screen.getByTestId("proposal-prop-0002")).toHaveTextContent(/approved/), T);
+    expect(screen.getByTestId("proposal-prop-0002")).toHaveTextContent(C.castAdmin2);
+    expect(screen.getByTestId("audit-note")).toHaveTextContent(/self-declared in this lab.*does not mean authenticated/);
   }, 60000);
 
   it("approve after deny is refused, and delete is refused on Databricks", async () => {
     await mount(); await live();
-    await proposeQuarantine("ag-bedrock-02", C.castAdmin);
+    await proposeQuarantine("ag-bedrock-02", C.castCustodian);
     await actAs(C.castAdmin2); await click("deny-prop-0001");
     await waitFor(() => expect(screen.getByTestId("proposal-prop-0001")).toHaveTextContent(/denied/), T);
     expect(screen.queryByTestId("approve-prop-0001")).toBeNull();
@@ -243,16 +251,20 @@ describe("Ownership (Live): propose, approve, execute, and the refusals", () => 
   it("a credential typed as the reason or a tag value is masked everywhere on the page and in the hops", async () => {
     await mount(); await live();
     const secret = ["gh", "p_", "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8"].join("");
+    const others = [["my pass", "word is Tr0ub4dor-horse-stapl3"].join(""), ["https://svc-user:", "Sup3rS3cretPw@db.example/p"].join(""), ["123-", "45-", "6789"].join(""), ["jane.doe", "@gmail.com"].join(""), ["4111 1111 ", "1111 1111"].join("")];
     await tab("Ownership"); await screen.findByTestId("propose-panel", {}, T);
     await actAs(C.castCustodian); await pick("p-agent", "ag-bedrock-01"); await pick("p-kind", "retag");
-    setValue("p-tagvalue", `v ${secret}`); setValue("p-reason", `because ${secret}`);
+    setValue("p-tagvalue", `v ${secret}`); setValue("p-reason", `because ${secret} and ${others.join(" and ")}`);
     await waitFor(() => expect(screen.getByTestId("propose")).toBeEnabled(), T);
     await click("propose");
     await waitFor(() => expect(screen.getByTestId("proposal-prop-0001")).toBeInTheDocument(), T);
-    expect(wholePageText()).not.toContain(secret);
+    const needles = [secret, "Tr0ub4dor", "Sup3rS3cretPw", "123-45-6789", "jane.doe", "4111 1111 1111"];
+    for (const n of needles) expect(wholePageText()).not.toContain(n);
     expect(wholePageText()).toMatch(/\[masked:/);
+    // the collapsed hops <pre> is in the DOM too: open it and check the markup text and the raw HTML
     fireEvent.click(within(screen.getByTestId("hops")).getByText(/Raw hops/));
-    expect(wholePageText()).not.toContain(secret);
+    expect(screen.getByTestId("hops").querySelectorAll("pre").length).toBeGreaterThan(0);
+    for (const n of needles) { expect(wholePageText()).not.toContain(n); const c = document.body.cloneNode(true); c.querySelectorAll("textarea,input").forEach((x) => x.remove()); expect(c.innerHTML).not.toContain(n); }
     expect(seen.some((s) => s.body.includes(secret))).toBe(true); // it was sent, and never came back
   }, 60000);
 
@@ -424,22 +436,34 @@ describe("Diagram, talk track, Reset", () => {
 });
 
 describe("stale answers", () => {
-  it("a late scenario answer never overwrites the scenario picked after it (stale-response guard on the state)", async () => {
+  it("a late scenario answer never overwrites the scenario picked after it (stale-response guard on the state), decided by releasing the held request, not by time", async () => {
     await mount();
-    delay = (u) => (u.includes("scenario=discover") ? 600 : 0);
+    let release; const held = new Promise((r) => { release = r; });
+    gate = (u) => (u.includes("scenario=discover") ? held : null);
     await pick("scenarios", "discover"); await pick("scenarios", "gateway");
-    await new Promise((r) => setTimeout(r, 1000));
     await waitFor(() => expect(screen.getByTestId("scenario-say")).toHaveTextContent(/typed confirmation/), T);
+    release();
+    await waitFor(() => expect(consumed.some((u) => u.includes("scenario=discover"))).toBe(true), T); // the app has read the stale answer
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.getByTestId("scenario-say")).toHaveTextContent(/typed confirmation/);
+    expect(screen.getByTestId("scenario-say")).not.toHaveTextContent(/second scan/i);
   }, 60000);
 
-  it("a write answer for a mode the visitor has already left is not shown (stale write guard)", async () => {
+  it("a write answer for a mode the visitor has already left is not shown (stale write guard), decided by releasing the held request", async () => {
     await mount(); await live(); await tab("Safe sync");
     await waitFor(() => expect(screen.getByTestId("run-sync")).toBeEnabled(), T);
-    delay = (u) => (u.includes("/api/sync") ? 700 : 0);
+    let release; const held = new Promise((r) => { release = r; });
+    gate = (u) => (u.includes("/api/sync") ? held : null);
     await click("run-sync"); await click("mode-mock");
-    await new Promise((r) => setTimeout(r, 1200));
     await waitFor(() => expect(screen.getByTestId("banner")).toHaveTextContent(/MOCK mode/), T);
-    expect(screen.queryByTestId("last-action")).toBeNull();
+    await tab("Inventory");
+    await waitFor(() => expect(screen.getByTestId("tile-live")).toHaveTextContent("23"), T);
+    release();
+    await waitFor(() => expect(consumed.some((u) => u.includes("/api/sync"))).toBe(true), T);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    // the stale answer carried the live engine after a second scan (26 agents): it must not replace the Mock table (23)
+    expect(screen.getByTestId("tile-live")).toHaveTextContent("23");
+    expect(screen.getByTestId("mode")).toHaveTextContent("Mode: mock");
   }, 60000);
 });
 

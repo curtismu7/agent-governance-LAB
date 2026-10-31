@@ -24,16 +24,16 @@ export function scenarioList(c) {
     },
     {
       id: 'approval', title: 'A custodian proposes, an administrator approves, then it runs',
-      say: 'Every custodian action needs approval from a tenant administrator before it executes. Self-approval, a custodian approving, approving too early and an unsupported delete are all refused, and the audit log names the acting user each time.',
+      say: 'A custodian\'s action needs approval from a tenant administrator before it executes; an administrator\'s own action runs at once, audited with the acting user. Self-approval, another custodian approving, approving too early and an unsupported delete are refused, and the audit log names the acting user each time.',
       steps: [
-        { say: `${C} proposes quarantining ${`ag-bedrock-02`}, a reconciler that holds an administrator grant.`, ...prop(C, 'ag-bedrock-02', 'quarantine', {}, 'Administrator grant on a reconciler') },
-        { say: `${C} tries to approve it: only a tenant administrator can.`, ...decide(C, 'prop-0001') },
-        { say: `${A} proposes a retag of another agent, then tries to approve it too: nobody approves their own proposal.`, ...prop(A, 'ag-bedrock-01', 'retag', { key: 'data-class', value: 'internal' }) },
-        { say: `${A} tries to approve their own proposal.`, ...decide(A, 'prop-0002') },
+        { say: `${C} proposes quarantining ag-bedrock-02, a reconciler that holds an administrator grant.`, ...prop(C, 'ag-bedrock-02', 'quarantine', {}, 'Administrator grant on a reconciler') },
+        { say: `${C} tries to approve their own proposal: refused.`, ...decide(C, 'prop-0001') },
+        { say: `${C2}, another custodian, tries to approve it: only a tenant administrator can.`, ...decide(C2, 'prop-0001') },
         { say: 'Running a proposal that is not yet approved is refused.', ...run(C, 'prop-0001') },
         { say: `${A} approves the quarantine.`, ...decide(A, 'prop-0001') },
         { say: `${C} executes it. The agent's identity is detached and its administrator-privilege finding no longer applies.`, ...run(C, 'prop-0001') },
         { say: `${A2} tries to approve it again: it is already decided.`, ...decide(A2, 'prop-0001') },
+        { say: `${A} is an administrator: their own retag runs immediately, with no second approval, and is audited with their name.`, ...prop(A, 'ag-bedrock-01', 'retag', { key: 'data-class', value: 'internal' }) },
         { say: `${A} proposes deleting a Databricks agent. The deck says delete is in development there, so it is refused.`, ...prop(A, 'ag-databricks-01', 'delete') },
       ],
     },
@@ -96,10 +96,10 @@ export function scenarioList(c) {
     },
     {
       id: 'succession-certify', title: 'A custodian leaves; a certification campaign runs',
-      say: 'When a custodian leaves, a transfer is proposed for each agent and an administrator approves each. A campaign asks each custodian to certify or revoke; a revoke goes through approval; unreviewed items escalate to an administrator.',
+      say: 'When a custodian leaves, a transfer is proposed for each agent and an administrator approves each (a lab reading, not the deck). A campaign asks each custodian to certify or revoke; a revoke goes through approval; unreviewed items escalate to an administrator.',
       steps: [
         { say: `${A} records that ${C2} has left, naming ${C3} as successor. A transfer is proposed for every agent ${C2} held.`, op: 'depart', params: { actor: A, person: C2, successor: C3 } },
-        { say: `${A2} approves the first transfer (${A} proposed it, so ${A} could not).`, ...decide(A2, 'prop-0001') },
+        { say: `${A2} approves the first transfer (the departure triggered it, so any administrator may; needing approval at all is a lab reading, not the deck).`, ...decide(A2, 'prop-0001') },
         { say: 'Executed.', ...run(A2, 'prop-0001') },
         { say: 'Denies the second.', ...decide(A2, 'prop-0002', 'deny') },
         { say: 'Approving after a denial is refused.', ...decide(A2, 'prop-0002') },
@@ -118,7 +118,7 @@ export function scenarioList(c) {
 export const EXPECTED = {
   'first-scan': [],
   discover: ['ok', 'ok', 'ok'],
-  approval: ['ok', 'admin_only', 'ok', 'self_approval', 'not_approved', 'ok', 'ok', 'already_decided', 'unsupported_on_source'],
+  approval: ['ok', 'self_approval', 'admin_only', 'not_approved', 'ok', 'ok', 'already_decided', 'ok', 'unsupported_on_source'],
   remediate: Array(12).fill('ok'),
   'partial-failure': ['ok', 'ok', 'ok', 'ok', 'bad_failure'],
   gateway: ['confirmation_mismatch', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'already_in_state', 'admin_only'],

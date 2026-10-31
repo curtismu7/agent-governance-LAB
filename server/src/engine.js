@@ -11,7 +11,9 @@ import { cleanFree } from './credentials.js';
 import { formatTraceparent } from './trace.js';
 import { refuse } from './errors.js';
 
-export const LIMITS = { proposals: 200, openPerAgent: 5, audit: 500, runs: 30, connections: 10, polls: 50, failures: 20, reason: 300, comment: 200, tags: 6, hops: 40, campaigns: 5, name: 60, sources: 3, scopeIds: 5 };
+export const AUDIT_MARGIN = 40; // new work is refused once fewer than this many audit slots are free: one action never writes more than this many entries
+export const SUCCESSION = 'succession (lab)'; // the proposer of a transfer that a custodian's departure triggers
+export const LIMITS = { proposals: 200, openPerAgent: 5, audit: 500, refusals: 200, runs: 30, connections: 10, polls: 50, failures: 20, reason: 300, comment: 200, tags: 6, hops: 40, campaigns: 5, name: 60, sources: 3, scopeIds: 5 };
 export const PROPOSAL_KINDS = ['delete', 'quarantine', 'strip-role', 'stop-flow', 'disable-credential', 'retag', 'reconfigure', 'transfer', 'revoke-access'];
 export const FAILURE_KINDS = ['timeout', 'error', 'throttled'];
 export const SCANNER_KINDS = ['aws-account', 'azure-subscription', 'gcp-project'];
@@ -41,7 +43,7 @@ export class Engine {
       seq: { audit: 0, proposal: 0, run: 0, campaign: 0, item: 0, conn: 0, poll: 0 },
       world: { records, present: new Set([...records.values()].filter((a) => !a.latent).map((a) => a.id)), released: false },
       agents: new Map(), people: new Map(buildRoster(this.cast).map((p) => [p.id, { ...p, departed: false }])),
-      proposals: [], audit: [], runs: [], campaigns: [], onboardedOus: [...DEFAULT_ONBOARDED_OUS], accountsSeen: new Set(),
+      proposals: [], audit: [], refusals: [], dropped: { refusals: 0, runs: 0, polls: 0 }, runs: [], campaigns: [], onboardedOus: [...DEFAULT_ONBOARDED_OUS], accountsSeen: new Set(),
       privateNetwork: { tenantEnabled: false, connections: [], polls: [] },
       gateways: seedGateways(this.cast), orphanEngines: seedOrphanEngines(),
     };
@@ -56,9 +58,13 @@ export class Engine {
   }
   audit(kind, actor, data = {}) {
     const a = { ...data, n: ++this.s.seq.audit, at: new Date(BASE_MS + this.s.seq.audit * 60_000).toISOString(), kind, actor };
-    this.s.audit.push(a); if (this.s.audit.length > LIMITS.audit) this.s.audit.shift();
+    // Refused attempts go to their own, smaller ring (counted when it drops), so a flood of refusals can never push out the record of what was decided or executed.
+    // Every other entry is kept: new work is refused (auditRoom) before the audit log is full.
+    if (kind.startsWith('refused:')) { this.s.refusals.push(a); if (this.s.refusals.length > LIMITS.refusals) { this.s.refusals.shift(); this.s.dropped.refusals += 1; } }
+    else this.s.audit.push(a);
     return a;
   }
+  auditRoom() { return LIMITS.audit - this.s.audit.length; }
   person(id) { return isStr(id) && this.s.people.has(id) ? this.s.people.get(id) : null; }
   // A valid, present roster member. Never echoes the value.
   actor(id) {
@@ -163,7 +169,7 @@ export class Engine {
     // Measured, not asserted: how many provider objects and inventory records this run removed.
     run.removedFromProvider = [...before.present].filter((id) => !s.world.present.has(id)).length;
     run.inventoryRecordsRemoved = [...before.records].filter((id) => !s.agents.has(id)).length;
-    s.runs.push(run); if (s.runs.length > LIMITS.runs) s.runs.shift();
+    s.runs.push(run); if (s.runs.length > LIMITS.runs) { s.runs.shift(); s.dropped.runs += 1; }
     this.audit('sync', who, { run: run.id, outcome: run.outcome, discovered: run.discovered.length, gone: run.gone.length, unknown: run.unknown.length, failedParts: run.parts.filter((p) => p.status === 'failed').length });
     return run;
   }
@@ -246,7 +252,7 @@ export class Engine {
     need(!this.openFor(a.id, kind, params), 'duplicate_proposal', 'the same proposal is already open for this agent', 409);
     const p = { id: `prop-${pad(++s.seq.proposal)}`, agentId: a.id, kind, params, reason, proposedBy: by, status: 'proposed', agentRev: a.rev, decidedBy: null, decision: null, comment: '', executedBy: null, result: null, ...extra };
     s.proposals.push(p);
-    this.audit('proposal.created', by, { proposal: p.id, agentId: a.id, proposalKind: kind });
+    this.audit('proposal.created', extra.recordedBy || by, { proposal: p.id, agentId: a.id, proposalKind: kind, ...(extra.recordedBy ? { proposedBy: by } : {}) });
     return p;
   }
 
@@ -261,6 +267,13 @@ export class Engine {
     const params = this.validateKind(a, input.kind, input.params === undefined ? {} : input.params);
     const reason = input.reason === undefined ? '' : (need(typeof input.reason === 'string', 'bad_reason', 'reason must be text'), cleanFree(input.reason, LIMITS.reason));
     const p = this.makeProposal(who.id, a, input.kind, params, reason);
+    // Only administrators act immediately (slide 45): an administrator's own action runs now, audited with the acting user. A custodian's waits for an administrator.
+    if (who.role === 'admin') {
+      p.status = 'approved'; p.decidedBy = who.id; p.decision = 'administrator-immediate';
+      this.audit('proposal.approved', who.id, { proposal: p.id, agentId: a.id, immediate: true });
+      const r = this.performProposal(p, who.id);
+      return { proposalId: p.id, status: p.status, immediate: true, result: r.result };
+    }
     return { proposalId: p.id, status: p.status };
   }
 
@@ -276,8 +289,8 @@ export class Engine {
     strictKeys(input, ['actor', 'proposalId', 'decision', 'comment'], 'the decision');
     const p = this.proposal(input.proposalId);
     const who = this.actor(input.actor);
-    if (who.role !== 'admin') { this.audit('refused:admin_only', who.id, { proposal: p.id }); throw refuse('admin_only', 'every custodian action needs approval from a tenant administrator', 403); }
     if (who.id === p.proposedBy) { this.audit('refused:self_approval', who.id, { proposal: p.id }); throw refuse('self_approval', 'nobody approves their own proposal', 403); }
+    if (who.role !== 'admin') { this.audit('refused:admin_only', who.id, { proposal: p.id }); throw refuse('admin_only', 'every custodian action needs approval from a tenant administrator', 403); }
     need(input.decision === 'approve' || input.decision === 'deny', 'bad_decision', 'decision must be approve or deny');
     const comment = input.comment === undefined ? '' : (need(typeof input.comment === 'string', 'bad_comment', 'comment must be text'), cleanFree(input.comment, LIMITS.comment));
     need(p.status !== 'denied', 'already_denied', 'that proposal was denied; propose it again', 409);
@@ -302,18 +315,24 @@ export class Engine {
     need(p.status !== 'denied', 'proposal_denied', 'that proposal was denied', 409);
     need(p.status !== 'stale', 'stale_proposal', 'that proposal went stale', 409);
     need(p.status === 'approved', 'not_approved', 'an administrator must approve the proposal before it runs', 409);
+    const r = this.performProposal(p, who.id);
+    return { proposalId: p.id, status: p.status, result: r.result };
+  }
+
+  // Runs an approved proposal: re-checks that the agent is unchanged and the precondition still holds (else the proposal goes stale), applies it, audits it.
+  performProposal(p, whoId) {
     const a = this.s.agents.get(p.agentId);
     if (!a || !this.live(a) || a.rev !== p.agentRev) { this.markStale(p, 'the agent changed after the approval'); throw refuse('stale_proposal', 'the agent changed after the approval; propose it again', 409); }
     let params;
     try { params = this.validateKind(a, p.kind, p.params); } catch (err) { this.markStale(p, 'the precondition no longer holds'); throw refuse('stale_proposal', 'the precondition no longer holds; propose it again', 409); }
     const result = this.apply(a, p.kind, params);
     this.bump(a);
-    p.status = 'executed'; p.executedBy = who.id; p.result = result;
-    this.audit('proposal.executed', who.id, { proposal: p.id, agentId: a.id, proposalKind: p.kind, approvedBy: p.decidedBy });
-    this.hop(`lab controller to the ${a.source} API: ${p.kind} (illustration, never sent)`, { method: p.kind === 'delete' ? 'DELETE' : 'POST', url: `https://${a.source}.api.lab.example/agents/${a.id}/${p.kind}`, body: { by: who.id, approvedBy: p.decidedBy } }, { status: 200, body: { ok: true } });
+    p.status = 'executed'; p.executedBy = whoId; p.result = result;
+    this.audit('proposal.executed', whoId, { proposal: p.id, agentId: a.id, proposalKind: p.kind, approvedBy: p.decidedBy });
+    this.hop(`lab controller to the ${a.source} API: ${p.kind} (illustration, never sent)`, { method: p.kind === 'delete' ? 'DELETE' : 'POST', url: `https://${a.source}.api.lab.example/agents/${a.id}/${p.kind}`, body: { by: whoId, approvedBy: p.decidedBy } }, { status: 200, body: { ok: true } });
     const item = this.itemFor(p);
     if (item && p.kind === 'revoke-access') { item.status = 'revoked'; item.decidedBy = p.proposedBy; }
-    return { proposalId: p.id, status: p.status, result };
+    return { result };
   }
 
   apply(a, kind, params) {
@@ -341,7 +360,8 @@ export class Engine {
     need(fresh.every((a) => this.s.proposals.filter((p) => OPEN.has(p.status) && p.agentId === a.id).length < LIMITS.openPerAgent), 'too_many_open', 'an agent has too many open proposals', 409);
     person.departed = true;
     this.audit('custodian.departed', who, { person: person.id, successor: succ.id, agents: held.length });
-    const created = fresh.map((a) => this.makeProposal(who, a, 'transfer', { to: succ.id }, 'succession: the custodian left', { succession: true }).id);
+    // The departure triggers the transfers (the system proposes), so any administrator may approve each one. Needing approval at all is a lab reading, not the deck.
+    const created = fresh.map((a) => this.makeProposal(SUCCESSION, a, 'transfer', { to: succ.id }, 'succession: the custodian left', { succession: true, recordedBy: who }).id);
     return { person: person.id, successor: succ.id, proposals: created, alreadyOpen: held.length - fresh.length };
   }
 
@@ -405,6 +425,12 @@ export class Engine {
     const p = this.makeProposal(who.id, a, 'revoke-access', params, `certification ${camp.id}: access revoked`, { item: item.id });
     item.status = 'revoke-proposed'; item.proposalId = p.id; item.decidedBy = who.id; item.comment = comment;
     this.audit('certification.revoke-proposed', who.id, { item: item.id, proposal: p.id });
+    // An administrator's revoke of an escalated item runs at once (administrators act immediately); a custodian's revoke waits for an administrator.
+    if (who.role === 'admin') {
+      p.status = 'approved'; p.decidedBy = who.id; p.decision = 'administrator-immediate';
+      this.audit('proposal.approved', who.id, { proposal: p.id, agentId: a.id, immediate: true });
+      this.performProposal(p, who.id);
+    }
     return { itemId: item.id, status: item.status, proposalId: p.id };
   }
 
@@ -434,10 +460,10 @@ export class Engine {
     if (creating || c.enabled !== undefined) { need(typeof c.enabled === 'boolean', 'bad_value', 'enabled must be true or false'); out.enabled = c.enabled; }
     if (creating || c.scannerRunsIn !== undefined) {
       const r = c.scannerRunsIn;
-      need(isObj(r) && Object.keys(r).every((k) => k === 'kind' || k === 'id') && typeof r.kind === 'string' && SCANNER_KINDS.includes(r.kind) && typeof r.id === 'string' && SCANNER_ID[r.kind].test(r.id), 'bad_scanner_location', 'scannerRunsIn is { kind: aws-account, azure-subscription or gcp-project, id in that form }');
+      need(isObj(r) && Object.keys(r).every((k) => k === 'kind' || k === 'id') && typeof r.kind === 'string' && SCANNER_KINDS.includes(r.kind) && typeof r.id === 'string' && SCANNER_ID[r.kind].test(r.id) && (r.kind === 'azure-subscription' || cleanFree(r.id) === r.id), 'bad_scanner_location', 'scannerRunsIn is { kind: aws-account, azure-subscription or gcp-project, id in that form }');
       out.scannerRunsIn = { kind: r.kind, id: r.id };
     }
-    if (creating) { need(isStr(c.scannerId, 30) && /^[a-z0-9-]+$/.test(c.scannerId), 'bad_scanner', 'scannerId must be lowercase letters, digits and dashes'); out.scannerId = c.scannerId; }
+    if (creating) { need(isStr(c.scannerId, 30) && /^[a-z0-9-]+$/.test(c.scannerId) && cleanFree(c.scannerId) === c.scannerId, 'bad_scanner', 'scannerId must be lowercase letters, digits and dashes'); out.scannerId = c.scannerId; }
     return out;
   }
 
@@ -484,7 +510,7 @@ export class Engine {
     need(live.length > 0, 'no_enabled_connection', 'no enabled connection to poll for', 409);
     for (const c of live) {
       const entry = { n: ++this.s.seq.poll, connection: c.id, direction: 'outbound', via: 'proxy.lab.example', to: 'controller.lab.example', scannerRunsIn: clone(c.scannerRunsIn), asked: 'any scan work for me?' };
-      pn.polls.push(entry); if (pn.polls.length > LIMITS.polls) pn.polls.shift();
+      pn.polls.push(entry); if (pn.polls.length > LIMITS.polls) { pn.polls.shift(); this.s.dropped.polls += 1; }
       this.hop(`Workload Connector dials OUT through the proxy (illustration, never sent)`, { method: 'POST', url: 'https://controller.lab.example/connector/poll', headers: { via: 'proxy.lab.example' }, body: { connection: c.id } }, { status: 200, body: { work: 'scan on the next sync' } });
     }
     this.audit('private-network.poll', who, { connections: live.length });
@@ -521,7 +547,7 @@ export class Engine {
   snapshot() {
     const s = this.s;
     const all = [...s.agents.values()];
-    const ctx = buildContext(all);
+    const ctx = buildContext(all, new Set([...s.people.values()].filter((x) => x.departed).map((x) => x.id)));
     const agents = all.map((a) => this.agentView(a, ctx));
     const liveAgents = agents.filter((a) => a.status === 'active' || a.status === 'unknown');
     const lastRun = s.runs[s.runs.length - 1] || null;
@@ -539,7 +565,8 @@ export class Engine {
         newestRun: newest, openProposals: s.proposals.filter((p) => OPEN.has(p.status)).length,
       },
       roster: [...s.people.values()].map((p) => ({ id: p.id, role: p.role, departed: p.departed, agents: all.filter((a) => a.custodian === p.id && this.live(a)).length })),
-      proposals: s.proposals.map((p) => ({ ...p })), audit: s.audit.map((a) => ({ ...a })),
+      proposals: s.proposals.map((p) => ({ ...p })), audit: [...s.audit, ...s.refusals].sort((x, y) => x.n - y.n).map((a) => ({ ...a })),
+      auditInfo: { cap: LIMITS.audit, used: s.audit.length, refusalsKept: s.refusals.length, refusalsCap: LIMITS.refusals, refusalsDropped: s.dropped.refusals, runsDropped: s.dropped.runs, pollsDropped: s.dropped.polls, room: LIMITS.audit - s.audit.length },
       campaign: s.campaigns.length ? clone(s.campaigns[s.campaigns.length - 1]) : null, campaigns: s.campaigns.length,
       sync: { runs: s.runs.map((r) => clone(r)), last: lastRun ? clone(lastRun) : null },
       org: { id: ORG_ID, onboardedOus: [...s.onboardedOus], ous: OUS, accounts: this.accountsView() },

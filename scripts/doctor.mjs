@@ -32,7 +32,7 @@ try {
     const self = await post(`/api/proposals/${id}/decision`, { decision: { actor: cast.castCustodian, decision: 'approve' } });
     const ok = await post(`/api/proposals/${id}/decision`, { decision: { actor: cast.castAdmin, decision: 'approve' } });
     const run = await post(`/api/proposals/${id}/execute`, { execute: { actor: cast.castAdmin } });
-    const good = sync.body.result.outcome === 'partial' && self.status === 403 && self.body.error === 'admin_only' && ok.body.ok && run.body.ok && run.body.state.agents.find((a) => a.id === 'ag-bedrock-02').quarantined;
+    const good = sync.body.result.outcome === 'partial' && self.status === 403 && self.body.error === 'self_approval' && ok.body.ok && run.body.ok && run.body.state.agents.find((a) => a.id === 'ag-bedrock-02').quarantined;
     report(good ? 'pass' : 'fail', 'engine-cycle', good ? 'a partial sync (one provider injected as silent), a proposal, a refused approval by a custodian, an administrator approval and the execute all behaved over the HTTP API' : 'the sync, propose, approve, execute cycle did not complete');
   } finally { health.stop(); await new Promise((res) => server.close(res)); }
 } catch { report('fail', 'engine-cycle', 'the HTTP cycle could not run'); }

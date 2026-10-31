@@ -3,7 +3,7 @@ import { BANNER, CLAIMS, CLAIM_LABEL, DECK_NUMBERS_TEXT, DISCREPANCIES, AVAILABI
 import { SOURCES, SCOPES, OUS, TAG_KEYS, RECONFIGURE_FIELDS, MODELS, QUARANTINE_NAMED_BY_DECK, PRIVATE_NETWORK_SOURCES } from './catalog.js';
 import { DECK_NUMBERS, FINDINGS, LEVELS, SCORE_CAP, STALE_CREDENTIAL_DAYS } from './findings.js';
 import { CHECKS, GATEWAY_ACTIONS } from './gateway.js';
-import { LIMITS, PROPOSAL_KINDS, FAILURE_KINDS, SCANNER_KINDS } from './engine.js';
+import { AUDIT_MARGIN, LIMITS, PROPOSAL_KINDS, FAILURE_KINDS, SCANNER_KINDS } from './engine.js';
 import { scenarioList } from './scenarios.js';
 
 export const rawStory = () => ({ title: TITLE, intro: INTRO, banner: BANNER, claims: CLAIMS, talkTrack: TALK_TRACK, why: WHY, discrepancies: DISCREPANCIES, availability: AVAILABILITY });
@@ -14,7 +14,7 @@ export function buildStory(cast, vertical) {
   return {
     title: s.title, intro: s.intro, release: RELEASE, claimLabel: CLAIM_LABEL, banner: s.banner, claims: s.claims, why: s.why, deckNumbers: { ...DECK_NUMBERS, text: DECK_NUMBERS_TEXT },
     discrepancies: s.discrepancies, availability: s.availability, notDemonstrated: NOT_DEMONSTRATED,
-    fieldSources: FIELD_SOURCES.map((f) => ({ ...f, sourceLabel: FIELD_SOURCE_NAMES[f.source] })), limitsText: LIMITS_TEXT, limits: LIMITS,
+    fieldSources: FIELD_SOURCES.map((f) => ({ ...f, sourceLabel: FIELD_SOURCE_NAMES[f.source] })), limitsText: LIMITS_TEXT, limits: { ...LIMITS, auditMargin: AUDIT_MARGIN },
     sources: SOURCES.map((x) => ({ ...x, quarantineNamedByDeck: QUARANTINE_NAMED_BY_DECK.includes(x.id) })), scopes: SCOPES, ous: OUS, privateNetworkSources: PRIVATE_NETWORK_SOURCES,
     findings: FINDINGS.map((f) => ({ id: f.id, name: f.name, category: f.category, points: f.points, says: f.says })), levels: LEVELS, scoreCap: SCORE_CAP, staleCredentialDays: STALE_CREDENTIAL_DAYS, models: MODELS,
     proposalKinds: PROPOSAL_KINDS, failureKinds: FAILURE_KINDS, scannerKinds: SCANNER_KINDS, tagKeys: TAG_KEYS, reconfigureFields: RECONFIGURE_FIELDS, gatewayActions: GATEWAY_ACTIONS, scorecardChecks: CHECKS.map(([id, name]) => ({ id, name })),

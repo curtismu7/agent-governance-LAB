@@ -4,12 +4,12 @@
 // already fully cleaned (long blobs included) on the way in by cleanFree.
 import { DETECTORS, maskSpans } from './credentials.js';
 
-const SPECIFIC = DETECTORS.filter((d) => d.id !== 'long-blob');
+const SPECIFIC = DETECTORS.filter((d) => !d.generic);
 const OPAQUE = new Set(['hash', 'prevHash', 'traceparent', 'traceId', 'chainHead']);
 
 export function maskResponseText(text) {
   const spans = [];
-  for (const d of SPECIFIC) { d.re.lastIndex = 0; for (const m of text.matchAll(d.re)) spans.push({ start: m.index, end: m.index + m[0].length, id: d.id }); }
+  for (const d of SPECIFIC) { d.re.lastIndex = 0; for (const m of text.matchAll(d.re)) if (!d.accept || d.accept(m[0])) spans.push({ start: m.index, end: m.index + m[0].length, id: d.id }); }
   return spans.length ? maskSpans(text, spans) : text;
 }
 

@@ -49,7 +49,7 @@ export default function OwnershipTab({ story, lab, actor }) {
       {ro && <p className="muted" data-testid="read-only-note">Mock only reads tables: switch to Live to propose, approve and execute.</p>}
       <section className="panel" aria-label="Ownership">
         <h2 className="panel__title">Ownership, custodians and remediation <ClaimTag /> <AvailTag value="GA" /></h2>
-        <p className="muted">Every agent has a named custodian; an orphaned agent has none and is flagged. Custodian operations are restricted to administrators and each agent's assigned custodian, are written to the audit log with the acting user, and every custodian action needs a tenant administrator's approval BEFORE it executes (slide 45). The three-step machine, the roles and the rules for self-approval and stale approvals are the lab's reading. Classification and rule-based custodian assignment are <AvailTag value="Roadmap (Q4 2026)" />: no behaviour is claimed; the lab only reads an owner hint at discovery.</p>
+        <p className="muted">Every agent has a named custodian; an orphaned agent has none and is flagged. Custodian operations are restricted to administrators and each agent's assigned custodian, are written to the audit log with the acting user, and a custodian's action needs a tenant administrator's approval BEFORE it executes, and only administrators act immediately (slide 45): an administrator's own action runs at once, audited. The three-step machine for a custodian's action, the roles and the rules for self-approval and stale approvals are the lab's reading. Classification and rule-based custodian assignment are <AvailTag value="Roadmap (Q4 2026)" />: no behaviour is claimed; the lab only reads an owner hint at discovery.</p>
         <h3 className="panel__sub">Roster</h3>
         <div className="scroll"><table className="tbl" data-testid="roster"><thead><tr><th>Person</th><th>Role</th><th>Agents held</th><th>Status</th></tr></thead>
           <tbody>{s.roster.map((p) => <tr key={p.id}><td>{visible(p.id)}</td><td>{p.role}</td><td>{p.agents}</td><td>{p.departed ? "left" : "here"}</td></tr>)}</tbody></table></div>
@@ -76,7 +76,7 @@ export default function OwnershipTab({ story, lab, actor }) {
 
       <section className="panel" aria-label="Proposals" data-testid="proposals-panel">
         <h3 className="panel__sub">2. Approve or deny, then 3. execute ({s.proposals.length})</h3>
-        <p className="muted">Only a tenant administrator approves, and never the person who proposed it. An approval goes stale if the agent changes before it runs.</p>
+        <p className="muted">Only a tenant administrator approves, and nobody approves their own proposal. An administrator's own proposal runs immediately (it shows as executed). An approval goes stale if the agent changes before it runs.</p>
         <div className="scroll"><table className="tbl tbl--wide" data-testid="proposals">
           <thead><tr><th>Proposal</th><th>Agent</th><th>Action</th><th>By</th><th>Status</th><th>Decided by</th><th><span className="sr-only">Actions</span></th></tr></thead>
           <tbody>
@@ -107,7 +107,7 @@ export default function OwnershipTab({ story, lab, actor }) {
 
       <section className="panel" aria-label="Succession" data-testid="succession">
         <h3 className="panel__sub">Succession <AvailTag value="described in the deck, availability not stated" /></h3>
-        <p className="muted">Slide 19: when a custodian leaves, agent transfer to a new custodian is triggered. The lab proposes one transfer per agent; a different administrator approves each.</p>
+        <p className="muted">Slide 19: when a custodian leaves, agent transfer to a new custodian is triggered. The lab proposes one transfer per agent and any administrator approves each: needing approval at all is a lab reading, not the deck.</p>
         <div className="filters">
           <label>Custodian who leaves<select value={leaver} onChange={(e) => setLeaver(e.target.value)} data-testid="leaver">{custodians.map((c) => <option key={c.id} value={c.id}>{visible(c.id)}</option>)}</select></label>
           <label>Successor<select value={successor} onChange={(e) => setSuccessor(e.target.value)} data-testid="successor">{custodians.filter((c) => c.id !== leaver).map((c) => <option key={c.id} value={c.id}>{visible(c.id)}</option>)}</select></label>
@@ -140,6 +140,7 @@ export default function OwnershipTab({ story, lab, actor }) {
 
       <section className="panel" aria-label="Audit log" data-testid="audit">
         <h3 className="panel__sub">Audit log (acting user on every entry)</h3>
+        <p className="muted" data-testid="audit-note">The acting user is self-declared in this lab (there is no sign-in), so "audited" here does not mean authenticated. The log keeps every entry: {s.auditInfo.used} of {s.auditInfo.cap} used, and new work is refused (Reset) when fewer than {story.limits.auditMargin} are free. Refused attempts are kept in a separate ring of {s.auditInfo.refusalsCap}: {s.auditInfo.refusalsKept} kept, {s.auditInfo.refusalsDropped} dropped.</p>
         <div className="scroll"><table className="tbl tbl--wide">
           <thead><tr><th>#</th><th>Logical time</th><th>Kind</th><th>Acting user</th><th>Detail</th></tr></thead>
           <tbody>{s.audit.slice(-25).reverse().map((a) => { const { n, at, kind, actor: who, ...rest } = a; return <tr key={n}><td>{n}</td><td>{at.slice(11, 16)}</td><td>{kind}</td><td>{visible(who)}</td><td>{visible(JSON.stringify(rest))}</td></tr>; })}</tbody>

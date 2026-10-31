@@ -37,7 +37,8 @@ test('a revoke is a proposal: it needs an administrator and only then revokes; d
   const id = item(e, 'ag-bedrock-02').id;
   const r = e.decideItem({ actor: K, itemId: id, decision: 'revoke' });
   assert.equal(item(e, 'ag-bedrock-02').status, 'revoke-proposed'); assert.equal(agentOf(e, 'ag-bedrock-02').revoked, false, 'nothing is revoked before approval');
-  assert.equal(codeOf(() => approve(e, K, r.proposalId)), 'admin_only');
+  assert.equal(codeOf(() => approve(e, K, r.proposalId)), 'self_approval');
+  assert.equal(codeOf(() => approve(e, K2, r.proposalId)), 'admin_only');
   deny(e, A, r.proposalId);
   assert.equal(item(e, 'ag-bedrock-02').status, 'pending'); assert.equal(item(e, 'ag-bedrock-02').proposalId, null);
   const r2 = e.decideItem({ actor: K, itemId: id, decision: 'revoke' });
@@ -78,13 +79,14 @@ test('campaign arguments are validated: unknown item, bad decision, wrong types,
   assert.equal(codeOf(() => e.startCampaign({ actor: A, action: 'close' })), 'no_open_campaign');
 });
 
-test('an agent whose custodian left starts escalated, and an administrator can revoke it', () => {
+test('an agent whose custodian left starts escalated, and an administrator\'s revoke of it runs at once (administrators act immediately)', () => {
   const e = newEngine(); e.depart({ actor: A, person: K2, successor: K3 });
   e.startCampaign({ actor: A2, action: 'start' });
   const it = item(e, 'ag-agentcore-01'); assert.equal(it.status, 'escalated'); assert.equal(it.custodian, null);
   const r = e.decideItem({ actor: A2, itemId: it.id, decision: 'revoke' });
-  approve(e, A, r.proposalId); exec(e, A2, r.proposalId);
-  assert.equal(agentOf(e, 'ag-agentcore-01').revoked, true);
+  assert.equal(item(e, 'ag-agentcore-01').status, 'revoked'); assert.equal(agentOf(e, 'ag-agentcore-01').revoked, true);
+  assert.equal(e.snapshot().proposals.find((p) => p.id === r.proposalId).status, 'executed');
+  assert.ok(e.snapshot().audit.some((a) => a.kind === 'proposal.executed' && a.actor === A2 && a.proposal === r.proposalId));
 });
 
 test('campaigns are capped at five per workspace; the sixth is refused whole', () => {

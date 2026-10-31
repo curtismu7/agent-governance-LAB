@@ -66,6 +66,7 @@ export default function PrivateTab({ story, lab, actor }) {
           <button type="button" className="primary" disabled={ro || lab.busy} onClick={sync} data-testid="scan">Run a sync (the scanner scans)</button>
         </div>
         <Outcome last={lab.last} prefix="/connector" />
+        <p className="muted" data-testid="polls-note">The poll log keeps the newest {story.limits.polls} polls; {s.auditInfo.pollsDropped} older ones have been dropped from it.</p>
         <div className="scroll"><table className="tbl tbl--wide" data-testid="polls"><thead><tr><th>#</th><th>Connection</th><th>Direction</th><th>Through</th><th>To</th><th>Scanner runs in</th></tr></thead>
           <tbody>{pn.polls.slice(-10).reverse().map((p) => <tr key={p.n}><td>{p.n}</td><td>{p.connection}</td><td><StatusTag status={p.direction} /></td><td>{p.via}</td><td>{p.to}</td><td>{p.scannerRunsIn.kind} {visible(p.scannerRunsIn.id)}</td></tr>)}
             {pn.polls.length === 0 && <tr><td colSpan={6}>No poll yet.</td></tr>}</tbody></table></div>

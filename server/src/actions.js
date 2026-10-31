@@ -1,6 +1,7 @@
 // One dispatch for everything that changes an engine, used by the API, the scripted scenarios and the tests, so they cannot drift apart.
 // A refusal from the engine is data ({ ok: false, status, code, detail }), never an exception; anything else is a bug and propagates.
-import { InputError } from './errors.js';
+import { InputError, refuse } from './errors.js';
+import { AUDIT_MARGIN } from './engine.js';
 
 const OPS = {
   sync: (e, p) => { const r = e.sync(p); return { run: r.id, outcome: r.outcome, discovered: r.discovered.length, recovered: r.recovered.length, gone: r.gone.length, unknown: r.unknown.length, failedParts: r.parts.filter((x) => x.status === 'failed').length, removedFromProvider: r.removedFromProvider, inventoryRecordsRemoved: r.inventoryRecordsRemoved }; },
@@ -22,6 +23,10 @@ export const OP_NAMES = Object.keys(OPS);
 
 export function perform(engine, op, params) {
   if (!Object.hasOwn(OPS, op)) throw new Error(`unknown op ${op}`);
-  try { return { ok: true, result: OPS[op](engine, params) }; }
+  try {
+    // The audit log never drops an entry: once it is nearly full, new work is refused (Reset), so nobody can push the record of an execution out.
+    if (engine.auditRoom() < AUDIT_MARGIN) throw refuse('workspace_full', `the audit log is nearly full (${engine.s.audit.length} of ${engine.s.audit.length + engine.auditRoom()} entries): Reset`, 409);
+    return { ok: true, result: OPS[op](engine, params) };
+  }
   catch (e) { if (e instanceof InputError) return { ok: false, status: e.status, code: e.code, detail: e.message }; throw e; }
 }

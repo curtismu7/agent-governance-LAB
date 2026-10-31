@@ -86,7 +86,7 @@ export default function GatewayTab({ story, lab, actor }) {
 
       <section className="panel" aria-label="Account metadata" data-testid="metadata">
         <h3 className="panel__sub">modelAgentCoreAccountMetadata <SourceTag source="swagger" /> <SourceTag source="invented" label="inner shapes lab-invented (the schema gives only the field name)" /></h3>
-        <p className="muted">The nine fields below are named in the console swagger (2026-10-31, schema only). In the real schema each is a string of JSON text; the shapes shown here are the lab's own and are computed from the gateway state above. Truncated: <strong data-testid="truncated">{String(s.agentCore.Truncated)}</strong> (computed from the size of the snapshot against a lab-invented limit).</p>
+        <p className="muted">The nine fields below are the ones the console swagger added between 2026-10-26 and 2026-10-31 (schema only); the definition has 30 fields in all, and the 21 others are not modelled. In the real schema each is a string of JSON text; the shapes shown here are the lab's own and are computed from the gateway state above. Truncated: <strong data-testid="truncated">{String(s.agentCore.Truncated)}</strong> (computed from the size of the snapshot against a lab-invented limit).</p>
         {NINE.filter((k) => k !== "Truncated").map((k) => <details key={k}><summary>{k}</summary><Json value={s.agentCore[k]} label={k} /></details>)}
       </section>
       <FieldSources fields={story.fieldSources.filter((f) => /Gateway|gateway/.test(f.field))} />

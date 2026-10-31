@@ -135,8 +135,7 @@ test('runs are kept to 30; each run has one part per source and scope it answers
 
 test('deleted agents are not counted as gone or unknown by later syncs', () => {
   const e = newEngine(); e.sync({});
-  const p = e.propose({ actor: A, agentId: 'ag-snowflake-01', kind: 'delete' });
-  e.decide({ actor: A2, proposalId: p.proposalId, decision: 'approve' }); e.execute({ actor: A, proposalId: p.proposalId });
+  e.propose({ actor: A, agentId: 'ag-snowflake-01', kind: 'delete' }); // an administrator's action runs at once
   assert.equal(statusOf(e, 'ag-snowflake-01'), 'deleted');
   const r = e.sync({}); assert.deepEqual([r.gone, r.unknown], [[], []]);
   assert.equal(statusOf(e, 'ag-snowflake-01'), 'deleted');

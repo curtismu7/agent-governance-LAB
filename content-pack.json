@@ -66,7 +66,7 @@
     {
       "id": "custodian-approval",
       "term": "Approval before a custodian action runs",
-      "definition": "Operations are restricted to administrators and each agent's assigned custodian and are written to the audit log with the acting user; every custodian action needs a tenant administrator's approval before it executes. The lab models it as propose, approve or deny, execute: self-approval, approve-after-deny and stale approvals are refused (lab reading). Ping release claim, UNVERIFIED on our tenant.",
+      "definition": "Operations are restricted to administrators and each agent's assigned custodian and are written to the audit log with the acting user; a custodian's action needs a tenant administrator's approval before it executes, and only administrators act immediately. The lab models a custodian's action as propose, approve or deny, execute: self-approval, approve-after-deny and stale approvals are refused (lab reading); an administrator's own action runs at once, audited. The acting user is self-declared in the lab. Ping release claim, UNVERIFIED on our tenant.",
       "aliases": [
         "propose approve execute"
       ]
@@ -91,7 +91,7 @@
     {
       "id": "gateway-governance",
       "term": "Governing the AgentCore gateway itself",
-      "definition": "The gateway is an object of policy: enable or disable a tool target, switch the WAF failure mode, close a bypass route, pin an endpoint, end a session, flip log-only to enforcing. The nine modelAgentCoreAccountMetadata field names (GatewayDetailJSON and the rest) come from the console swagger, schema only; their inner shapes are lab-invented. Ping release claim, UNVERIFIED on our tenant.",
+      "definition": "The gateway is an object of policy: enable or disable a tool target, switch the WAF failure mode, close a bypass route, pin an endpoint, end a session, flip log-only to enforcing. The nine newly added modelAgentCoreAccountMetadata field names (GatewayDetailJSON and the rest; the schema has 30 fields in all, 21 not modelled) come from the console swagger, schema only; their inner shapes are lab-invented. Ping release claim, UNVERIFIED on our tenant.",
       "aliases": [
         "gateway scorecard"
       ]
@@ -181,7 +181,7 @@
     {
       "id": "try-approval",
       "label": "Scenario 3: A custodian proposes, an administrator approves, then it runs",
-      "description": "Every custodian action needs approval from a tenant administrator before it executes. Self-approval, a custodian approving, approving too early and an unsupported delete are all refused, and the audit log names the acting user each time.",
+      "description": "A custodian's action needs approval from a tenant administrator before it executes; an administrator's own action runs at once, audited with the acting user. Self-approval, another custodian approving, approving too early and an unsupported delete are refused, and the audit log names the acting user each time.",
       "group": "try-it",
       "action": {
         "type": "route",
@@ -255,7 +255,7 @@
     {
       "id": "try-succession-certify",
       "label": "Scenario 8: A custodian leaves; a certification campaign runs",
-      "description": "When a custodian leaves, a transfer is proposed for each agent and an administrator approves each. A campaign asks each custodian to certify or revoke; a revoke goes through approval; unreviewed items escalate to an administrator.",
+      "description": "When a custodian leaves, a transfer is proposed for each agent and an administrator approves each (a lab reading, not the deck). A campaign asks each custodian to certify or revoke; a revoke goes through approval; unreviewed items escalate to an administrator.",
       "group": "try-it",
       "action": {
         "type": "route",
@@ -271,7 +271,7 @@
     {
       "id": "try-self-approval",
       "label": "Approve your own proposal",
-      "description": "Propose as an administrator and try to approve it yourself: refused. A custodian cannot approve at all.",
+      "description": "Propose as a custodian and try to approve it yourself: refused. Another custodian cannot approve either; an administrator's own action runs immediately.",
       "group": "try-it",
       "action": {
         "type": "route",
@@ -389,7 +389,7 @@
     {
       "id": "S03",
       "title": "A custodian proposes, an administrator approves, then it runs",
-      "say": "Every custodian action needs approval from a tenant administrator before it executes. Self-approval, a custodian approving, approving too early and an unsupported delete are all refused, and the audit log names the acting user each time."
+      "say": "A custodian's action needs approval from a tenant administrator before it executes; an administrator's own action runs at once, audited with the acting user. Self-approval, another custodian approving, approving too early and an unsupported delete are refused, and the audit log names the acting user each time."
     },
     {
       "id": "S04",
@@ -414,7 +414,7 @@
     {
       "id": "S08",
       "title": "A custodian leaves; a certification campaign runs",
-      "say": "When a custodian leaves, a transfer is proposed for each agent and an administrator approves each. A campaign asks each custodian to certify or revoke; a revoke goes through approval; unreviewed items escalate to an administrator."
+      "say": "When a custodian leaves, a transfer is proposed for each agent and an administrator approves each (a lab reading, not the deck). A campaign asks each custodian to certify or revoke; a revoke goes through approval; unreviewed items escalate to an administrator."
     }
   ]
 }

@@ -34,19 +34,35 @@ test('WHO MAY PROPOSE: an administrator or the agent\'s assigned custodian; a me
   assert.equal(codeOf(() => prop(e, K, 'ag-bedrock-02', 'quarantine')), 'actor_departed');
 });
 
-test('WHO MAY APPROVE: only an administrator, never the proposer, even an administrator', () => {
+test('WHO MAY APPROVE: only an administrator; a custodian approving their own proposal is refused as self-approval, another custodian or a member as admin-only', () => {
   const e = newEngine();
   const p = prop(e, K, 'ag-bedrock-02', 'quarantine');
-  assert.equal(codeOf(() => approve(e, K, p.proposalId)), 'admin_only', 'the custodian who proposed');
+  assert.equal(codeOf(() => approve(e, K, p.proposalId)), 'self_approval', 'SELF-APPROVAL by the custodian who proposed');
+  assert.equal(codeOf(() => deny(e, K, p.proposalId)), 'self_approval', 'a self-denial is refused too');
   assert.equal(codeOf(() => approve(e, K2, p.proposalId)), 'admin_only', 'another custodian');
   assert.equal(codeOf(() => approve(e, O, p.proposalId)), 'admin_only');
-  const q = prop(e, A, 'ag-bedrock-01', 'quarantine');
-  assert.equal(codeOf(() => approve(e, A, q.proposalId)), 'self_approval', 'SELF-APPROVAL by an administrator');
-  assert.equal(codeOf(() => deny(e, A, q.proposalId)), 'self_approval', 'a self-denial is refused too');
-  assert.equal(proposal(e, q.proposalId).status, 'proposed');
-  assert.deepEqual(audit(e).filter((a) => a.kind === 'refused:self_approval').map((a) => a.actor), [A, A]);
-  approve(e, A2, q.proposalId); // the other administrator may
-  assert.equal(proposal(e, q.proposalId).decidedBy, A2);
+  assert.equal(proposal(e, p.proposalId).status, 'proposed');
+  assert.deepEqual(audit(e).filter((a) => a.kind === 'refused:self_approval').map((a) => a.actor), [K, K]);
+  assert.deepEqual(audit(e).filter((a) => a.kind === 'refused:admin_only').map((a) => a.actor), [K2, O]);
+  approve(e, A2, p.proposalId); // either administrator may
+  assert.equal(proposal(e, p.proposalId).decidedBy, A2);
+});
+
+test('ADMINISTRATORS ACT IMMEDIATELY (slide 45: only administrators act immediately): an administrator\'s own action runs at once with no second approval, audited with the acting user', () => {
+  const e = newEngine();
+  const r = prop(e, A, 'ag-bedrock-02', 'quarantine', {}, { reason: 'now' });
+  assert.deepEqual([r.status, r.immediate], ['executed', true]);
+  assert.equal(agentOf(e, 'ag-bedrock-02').quarantined, true);
+  const p = proposal(e, r.proposalId); assert.deepEqual([p.status, p.proposedBy, p.decidedBy, p.executedBy, p.decision], ['executed', A, A, A, 'administrator-immediate']);
+  assert.deepEqual(audit(e).filter((a) => a.proposal === r.proposalId).map((a) => [a.kind, a.actor]), [['proposal.created', A], ['proposal.approved', A], ['proposal.executed', A]]);
+  assert.equal(codeOf(() => approve(e, A2, r.proposalId)), 'already_decided', 'a decision is final');
+  assert.equal(codeOf(() => exec(e, A, r.proposalId)), 'already_executed');
+  // a custodian's own action still waits
+  const k = prop(e, K, 'ag-bedrock-01', 'quarantine'); assert.equal(k.status, 'proposed'); assert.equal(agentOf(e, 'ag-bedrock-01').quarantined, false);
+  // immediate actions are still validated and refused
+  assert.equal(codeOf(() => prop(e, A, 'ag-databricks-01', 'delete')), 'unsupported_on_source');
+  assert.equal(codeOf(() => prop(e, A, 'ag-bedrock-02', 'quarantine')), 'already_in_state');
+  assert.equal(codeOf(() => prop(e, A, 'ag-bedrock-01', 'quarantine')), 'duplicate_proposal', 'an open custodian proposal for the same thing');
 });
 
 test('APPROVE AFTER DENY is refused, and so is deny after deny, approve after approve and a decision on an executed proposal', () => {
@@ -107,20 +123,20 @@ test('WHO MAY EXECUTE: the proposer or an administrator, not anyone else', () =>
 
 test('DELETE works on twelve of thirteen sources and is refused on Databricks (in development)', () => {
   const e = newEngine(); discoverAll(e);
-  const snap = e.snapshot(); const bySource = new Map();
-  for (const a of snap.agents) if (!bySource.has(a.source) && a.status === 'active') bySource.set(a.source, a);
+  const bySource = new Map();
+  for (const a of e.snapshot().agents) if (!bySource.has(a.source) && a.status === 'active') bySource.set(a.source, a);
   assert.equal(bySource.size, 13);
   let ok = 0; const refused = [];
   for (const [source, a] of bySource) {
-    const code = codeOf(() => prop(e, A, a.id, 'delete'));
+    const code = codeOf(() => e.validateKind(e.s.agents.get(a.id), 'delete', {}));
     if (code === null) ok += 1; else { assert.equal(code, 'unsupported_on_source'); refused.push(source); }
   }
   assert.deepEqual([ok, refused], [12, ['databricks']]);
   assert.equal(SOURCES.filter((s) => s.delete).length, 12);
-  // it really deletes: execute one
-  const p = e.snapshot().proposals.find((x) => x.agentId === bySource.get('snowflake').id);
-  approve(e, A2, p.id); exec(e, A, p.id);
-  assert.equal(agentOf(e, bySource.get('snowflake').id).status, 'deleted'); assert.ok(!e.snapshot().provider.present.includes(bySource.get('snowflake').id));
+  assert.equal(codeOf(() => prop(e, A, bySource.get('databricks').id, 'delete')), 'unsupported_on_source');
+  const id = bySource.get('snowflake').id;
+  remediate(e, A, id, 'delete');
+  assert.equal(agentOf(e, id).status, 'deleted'); assert.ok(!e.snapshot().provider.present.includes(id));
 });
 
 test('QUARANTINE works on exactly the seven sources the deck names; the deck says nine but names seven, so the lab models seven; a repeat is refused', () => {
@@ -129,7 +145,7 @@ test('QUARANTINE works on exactly the seven sources the deck names; the deck say
   for (const a of e.snapshot().agents) if (!bySource.has(a.source) && a.status === 'active') bySource.set(a.source, a);
   const supported = [];
   for (const [source, a] of bySource) {
-    const code = codeOf(() => prop(e, A, a.id, 'quarantine'));
+    const code = codeOf(() => e.validateKind(e.s.agents.get(a.id), 'quarantine', {}));
     if (code === null) supported.push(source); else assert.equal(code, 'unsupported_on_source', source);
   }
   assert.equal(supported.length, 7);
@@ -147,7 +163,6 @@ test('Google Agent Builder and Azure AI Foundry refuse quarantine, with a clear 
     assert.equal(agentOf(e, id).quarantined, false);
   }
   assert.equal(e.snapshot().proposals.length, 0, 'nothing was proposed');
-  assert.ok(codeOf(() => prop(e, A, 'ag-agentbuilder-01', 'delete')) === null, 'delete still works on Agent Builder');
 });
 
 test('QUARANTINE is real: the identity is detached, so the findings that depended on its reach stop, and the others stay', () => {
@@ -227,22 +242,24 @@ test('an agent carries at most six tags, and the whole proposal is refused beyon
 
 test('DUPLICATES and CAPS: the same proposal cannot be open twice, an agent has at most 5 open, a workspace at most 200; the whole request is refused, nothing is dropped', () => {
   const e = newEngine();
-  const p = prop(e, A, 'ag-bedrock-01', 'quarantine');
-  assert.equal(codeOf(() => prop(e, A2, 'ag-bedrock-01', 'quarantine')), 'duplicate_proposal');
-  approve(e, A2, p.proposalId); assert.equal(codeOf(() => prop(e, A2, 'ag-bedrock-01', 'quarantine')), 'duplicate_proposal', 'an approved one is still open');
-  deny(e, A2, prop(e, A, 'ag-bedrock-01', 'reconfigure', { field: 'logging', value: false }).proposalId);
-  assert.equal(codeOf(() => prop(e, A, 'ag-bedrock-01', 'reconfigure', { field: 'logging', value: false })), null, 'a denied one can be proposed again');
+  const p = prop(e, K, 'ag-bedrock-01', 'quarantine');
+  assert.equal(codeOf(() => prop(e, K, 'ag-bedrock-01', 'quarantine')), 'duplicate_proposal');
+  assert.equal(codeOf(() => prop(e, A, 'ag-bedrock-01', 'quarantine')), 'duplicate_proposal', 'an administrator\'s identical action is refused while the custodian\'s is open');
+  approve(e, A2, p.proposalId); assert.equal(codeOf(() => prop(e, K, 'ag-bedrock-01', 'quarantine')), 'duplicate_proposal', 'an approved one is still open');
+  deny(e, A2, prop(e, K, 'ag-bedrock-01', 'reconfigure', { field: 'logging', value: false }).proposalId);
+  assert.equal(codeOf(() => prop(e, K, 'ag-bedrock-01', 'reconfigure', { field: 'logging', value: false })), null, 'a denied one can be proposed again');
   // open cap: 5 per agent
   const e2 = newEngine();
   const ks = [['retag', { key: 'cost-center', value: 'a' }], ['retag', { key: 'cost-center', value: 'b' }], ['retag', { key: 'data-class', value: 'a' }], ['reconfigure', { field: 'logging', value: false }], ['reconfigure', { field: 'publicAccess', value: true }]];
-  for (const [k, pr] of ks) prop(e2, A, 'ag-bedrock-01', k, pr);
-  assert.equal(codeOf(() => prop(e2, A, 'ag-bedrock-01', 'quarantine')), 'too_many_open');
+  for (const [k, pr] of ks) prop(e2, K, 'ag-bedrock-01', k, pr);
+  assert.equal(codeOf(() => prop(e2, K, 'ag-bedrock-01', 'quarantine')), 'too_many_open');
   assert.equal(e2.snapshot().proposals.length, 5);
   // workspace cap: 200
-  const e3 = newEngine(); const live = e3.snapshot().agents;
-  for (let i = 0; i < 200; i++) deny(e3, A2, prop(e3, A, live[i % live.length].id, 'retag', { key: 'cost-center', value: `v${i}` }).proposalId);
+  const e3 = newEngine(); const mine = e3.snapshot().agents.filter((a) => a.custodian === K);
+  assert.ok(mine.length >= 5);
+  for (let i = 0; i < 200; i++) deny(e3, A2, prop(e3, K, mine[i % mine.length].id, 'retag', { key: 'cost-center', value: `v${i}` }).proposalId);
   assert.equal(e3.snapshot().proposals.length, 200);
-  assert.equal(codeOf(() => prop(e3, A, 'ag-snowflake-02', 'quarantine')), 'workspace_full');
+  assert.equal(codeOf(() => prop(e3, K, mine[0].id, 'quarantine')), 'workspace_full');
   assert.equal(e3.snapshot().proposals.length, 200, 'nothing was dropped to make room');
 });
 
@@ -261,17 +278,19 @@ test('decision and execute arguments are validated: unknown proposal, bad decisi
   assert.equal(proposal(e, p.proposalId).status, 'proposed');
 });
 
-test('SUCCESSION: a departure proposes a transfer per agent; each needs a different administrator; the departed custodian can no longer act', () => {
+test('SUCCESSION: a departure proposes a transfer per agent (the system proposes, any administrator approves: a lab reading); the departed custodian can no longer act', () => {
   const e = newEngine();
   const held = e.snapshot().agents.filter((a) => a.custodian === K2).map((a) => a.id);
   assert.ok(held.length >= 5);
   const r = e.depart({ actor: A, person: K2, successor: K3 });
   assert.equal(r.proposals.length, held.length);
-  for (const pid of r.proposals) { const pr = proposal(e, pid); assert.deepEqual([pr.kind, pr.params, pr.proposedBy, pr.succession], ['transfer', { to: K3 }, A, true]); assert.equal(codeOf(() => approve(e, A, pid)), 'self_approval'); }
+  for (const pid of r.proposals) { const pr = proposal(e, pid); assert.deepEqual([pr.kind, pr.params, pr.proposedBy, pr.succession, pr.status], ['transfer', { to: K3 }, 'succession (lab)', true, 'proposed']); }
+  assert.deepEqual(audit(e).filter((a) => a.kind === 'proposal.created').map((a) => [a.actor, a.proposedBy]).slice(0, 1), [[A, 'succession (lab)']], 'the audit names the administrator who recorded the departure');
   assert.ok(e.snapshot().agents.filter((a) => a.custodian === K2).every((a) => a.actionRequired.includes('custodian-departed')));
-  approve(e, A2, r.proposals[0]); exec(e, A2, r.proposals[0]);
+  approve(e, A, r.proposals[0]); exec(e, A2, r.proposals[0]); // any administrator, including the one who recorded the departure
   const moved = proposal(e, r.proposals[0]).agentId;
   assert.equal(agentOf(e, moved).custodian, K3); assert.ok(!agentOf(e, moved).actionRequired.includes('custodian-departed'));
+  assert.equal(codeOf(() => approve(e, K3, r.proposals[1])), 'admin_only', 'a custodian cannot approve a transfer');
   assert.equal(codeOf(() => prop(e, K2, held[1], 'quarantine')), 'actor_departed');
   assert.equal(e.snapshot().roster.find((p) => p.id === K2).departed, true);
 });
@@ -291,11 +310,11 @@ test('departure arguments: administrator only, a custodian who is still here, a 
   assert.equal(codeOf(() => e.depart({ actor: A, person: K, successor: K2 })), 'bad_custodian', 'a departed custodian cannot be the successor');
 });
 
-test('a transfer to a successor who has since left is stale or refused at execution', () => {
+test('a transfer to a successor who has since left is refused as stale at execution', () => {
   const e = newEngine();
-  const p = prop(e, A, 'ag-bedrock-01', 'transfer', { to: K3 }); approve(e, A2, p.proposalId);
+  const p = prop(e, K, 'ag-bedrock-01', 'transfer', { to: K3 }); approve(e, A2, p.proposalId);
   e.depart({ actor: A, person: K3, successor: K2 });
-  assert.equal(codeOf(() => exec(e, A, p.proposalId)), 'stale_proposal');
+  assert.equal(codeOf(() => exec(e, K, p.proposalId)), 'stale_proposal');
 });
 
 test('the order of operations does not matter for the audit: every state change is by a named actor', () => {

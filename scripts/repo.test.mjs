@@ -87,7 +87,7 @@ test('the lab ships no k8s manifests (deferred by the owner, 2026-10-31)', () =>
 
 test('README sections follow the standard order (Troubleshooting, Ownership, Not done) and list the known detection limits and the input limits; conformance is said to be run by hand', () => {
   const r = read('README.md');
-  for (const limit of ['200 proposals', '5 open', '500 audit entries', '30 sync runs', '5 campaigns', '10 private-network connections', '50 connector polls', '20 injected failures', '6 tags', '40 hops', '300 characters']) assert.ok(r.includes(limit), `the README states the limit: ${limit}`);
+  for (const limit of ['200 proposals', '5 open', 'holds 500', 'fewer than 40 slots', 'separate ring of 200', 'newest 30', 'newest 50', '5 campaigns', '10 private-network connections', '20 injected failures', '6 tags', '40 hops', '300 characters', 'self-declared', '429']) assert.ok(r.includes(limit), `the README states the limit: ${limit}`);
   const at = (h) => r.indexOf(`\n## ${h}`);
   const order = ['What is simulated', 'Run from a clone', 'Settings file', 'Ports, and what to do', 'Mock and live modes', 'Health, doctor and reset', 'Docker', 'Tests', 'Troubleshooting', 'Ownership', 'Not done'].map(at);
   assert.ok(order.every((i) => i > 0), order.join());

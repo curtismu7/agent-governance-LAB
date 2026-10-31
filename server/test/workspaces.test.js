@@ -21,13 +21,17 @@ test('engines are per workspace and per vertical, created on first use, and rese
   assert.equal(w.peek('a', 'finance'), null); assert.equal(w.peek('b', 'finance'), b);
 });
 
-test('the store expires old workspaces and caps their count', () => {
+test('the store expires idle workspaces after the ttl, and REFUSES a new one at the cap (nothing is evicted to make room)', () => {
   let t = 0;
   const w = createWorkspaces({ max: 3, ttlMs: 100, now: () => t });
-  for (const id of ['a', 'b', 'c', 'd']) w.engine(id, 'finance', C);
+  for (const id of ['a', 'b', 'c']) w.engine(id, 'finance', C);
   assert.equal(w.size(), 3);
-  assert.equal(w.peek('a', 'finance'), null, 'the oldest is dropped');
+  assert.throws(() => w.engine('d', 'finance', C), (e) => e.code === 'too_many_workspaces' && e.status === 429);
+  assert.equal(w.size(), 3); assert.ok(w.peek('a', 'finance'), 'the oldest is still there');
+  w.engine('a', 'finance', C); // an existing one is fine
   t = 500;
   assert.equal(w.peek('d', 'finance'), null);
+  assert.equal(w.peek('a', 'finance'), null, 'an idle one expires');
   assert.equal(w.size(), 0);
+  w.engine('d', 'finance', C); assert.equal(w.size(), 1, 'room again once the idle ones expired');
 });
