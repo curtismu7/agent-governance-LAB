@@ -1,0 +1,201 @@
+{
+  "schema": "diagram-studio/1",
+  "id": "governance-cycle",
+  "title": "Discover, review, own, approve, remediate",
+  "lede": "Agents in cloud consoles are discovered, their execution identities reviewed and scored, a custodian proposes an action, a tenant administrator approves it, and only then does it run. Every step is written to the audit log with the acting user. Ping release claim, UNVERIFIED on our tenant. Simulated.",
+  "groups": {
+    "src": {
+      "label": "Providers",
+      "color": "grey"
+    },
+    "ping": {
+      "label": "Governance",
+      "color": "red"
+    },
+    "people": {
+      "label": "People",
+      "color": "blue"
+    },
+    "rec": {
+      "label": "Record",
+      "color": "dark"
+    }
+  },
+  "nodes": [
+    {
+      "id": "src",
+      "label": "Thirteen sources: AWS, Google, Azure, Salesforce, Databricks, Snowflake",
+      "group": "src",
+      "x": 0,
+      "y": 300
+    },
+    {
+      "id": "conn",
+      "label": "Workload Connector and Scanner (private networks)",
+      "group": "src",
+      "x": 400,
+      "y": 0
+    },
+    {
+      "id": "disc",
+      "label": "Discovery and safe sync",
+      "group": "ping",
+      "x": 400,
+      "y": 300
+    },
+    {
+      "id": "inv",
+      "label": "Inventory: identity, model, configuration, custodian",
+      "group": "ping",
+      "x": 800,
+      "y": 300
+    },
+    {
+      "id": "rev",
+      "label": "Permission review and risk score",
+      "group": "ping",
+      "x": 1200,
+      "y": 300
+    },
+    {
+      "id": "cust",
+      "label": "Custodian ({{castCustodian}})",
+      "group": "people",
+      "x": 1200,
+      "y": 600
+    },
+    {
+      "id": "adm",
+      "label": "Tenant administrator ({{castAdmin}})",
+      "group": "people",
+      "x": 800,
+      "y": 600
+    },
+    {
+      "id": "act",
+      "label": "Remediation: delete, quarantine, targeted fixes",
+      "group": "ping",
+      "x": 400,
+      "y": 600
+    },
+    {
+      "id": "audit",
+      "label": "Audit log (acting user)",
+      "group": "rec",
+      "x": 0,
+      "y": 600
+    }
+  ],
+  "edges": [
+    {
+      "source": "src",
+      "target": "disc",
+      "label": "agents and identities"
+    },
+    {
+      "source": "conn",
+      "target": "disc",
+      "label": "polls out through your proxy"
+    },
+    {
+      "source": "disc",
+      "target": "inv",
+      "label": "normalise, classify, assign a custodian"
+    },
+    {
+      "source": "inv",
+      "target": "rev",
+      "label": "identity read against its provider"
+    },
+    {
+      "source": "rev",
+      "target": "cust",
+      "label": "findings and score"
+    },
+    {
+      "source": "cust",
+      "target": "adm",
+      "label": "proposes an action"
+    },
+    {
+      "source": "adm",
+      "target": "act",
+      "label": "approves, then it runs"
+    },
+    {
+      "source": "act",
+      "target": "src",
+      "label": "delete, quarantine, fix"
+    },
+    {
+      "source": "act",
+      "target": "audit",
+      "label": "who did what"
+    }
+  ],
+  "steps": [
+    {
+      "title": "Agents are listed",
+      "what": "Each provider part of a sync lists its agents and their execution identities.",
+      "edges": [
+        0
+      ]
+    },
+    {
+      "title": "The connector polls out",
+      "what": "Inside your own network the connector only dials out, through your proxy.",
+      "edges": [
+        1
+      ]
+    },
+    {
+      "title": "Discovery normalises",
+      "what": "New agents are classified and assigned a custodian from an owner hint, or flagged orphaned.",
+      "edges": [
+        2
+      ]
+    },
+    {
+      "title": "Review",
+      "what": "Each execution identity is read against what its provider says it can do.",
+      "edges": [
+        3
+      ]
+    },
+    {
+      "title": "Findings reach the custodian",
+      "what": "The lab's thirteen findings give a five-level score. The deck says 46 findings; those are Ping's.",
+      "edges": [
+        4
+      ]
+    },
+    {
+      "title": "The custodian proposes",
+      "what": "A custodian can only propose. Nothing runs yet.",
+      "edges": [
+        5
+      ]
+    },
+    {
+      "title": "An administrator approves",
+      "what": "A different tenant administrator approves or denies; self-approval is refused. Then it executes.",
+      "edges": [
+        6
+      ]
+    },
+    {
+      "title": "It runs at the provider",
+      "what": "Delete (twelve sources), quarantine (nine) or a targeted fix, simulated.",
+      "edges": [
+        7
+      ]
+    },
+    {
+      "title": "Everything is recorded",
+      "what": "Each step is written to the audit log with the acting user.",
+      "edges": [
+        8
+      ]
+    }
+  ]
+}

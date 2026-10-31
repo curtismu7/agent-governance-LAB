@@ -1,0 +1,115 @@
+// Story data. Every string may carry {{cast}} tokens; cast.js fills them from a vertical pack. Every product claim is "Ping release claim, UNVERIFIED on our tenant":
+// the 2026-11-02 release is not on our tenant. Shapes marked lab-invented are ours.
+export const TITLE = 'Agent Governance LAB';
+export const RELEASE = '2026-11-02';
+export const CLAIM_LABEL = 'Ping release claim, UNVERIFIED on our tenant';
+export const INTRO = 'Agents created in cloud consoles sit outside identity processes: nobody inventoried them and nobody knows what they reach. The claim (AI Platform Agents, the Ping ID4AI Workforce H2 2026 deck, slide 45): a cross-cloud inventory across thirteen sources, a permission review of each agent\'s execution identity, a five-level risk score, a named custodian for every agent, approval before any custodian action runs, remediation, a sync that never confuses "gone" with "did not answer", and governance of the AgentCore gateway itself.';
+
+export const BANNER = {
+  mock: `SIMULATED, MOCK mode: tables generated from the lab's own governance engine and read-only. Every product claim is a ${CLAIM_LABEL} (release ${RELEASE}). No cloud account, provider API, gateway or tenant is touched. The inventory, findings, score and gateway shapes are the lab's own.`,
+  live: `SIMULATED, LIVE mode: the lab's own local governance engine acts on your proposals, approvals, syncs and gateway changes, loopback only, zero outbound network. Every product claim is a ${CLAIM_LABEL} (release ${RELEASE}). No cloud account, provider API, gateway or tenant is touched.`,
+};
+
+export const DECK_NUMBERS_TEXT = 'The deck\'s numbers: 13 sources, 46 findings, 5 levels (slide 45). The lab ships 13 sources, its own 13 illustrative findings and its own 5-level score.';
+
+export const CLAIMS = [
+  { id: 'sources', claim: 'Thirteen sources: AWS Bedrock Agents, AWS Bedrock AgentCore, Amazon Lex, Amazon Bedrock Flows, Google Vertex AI Agent Engine, Google Agent Builder, Google Agent Registry, Dialogflow CX, Azure AI Foundry, Microsoft Copilot Studio, Salesforce Agentforce, Databricks Mosaic AI, Snowflake Cortex AI (slide 45).', slide: 45 },
+  { id: 'inventory', claim: 'Cross-cloud inventory: every agent with its identity, model, configuration and owner, including A2A-native agents from the GCP Agent Registry with their agent cards. AWS Organizations member accounts are enumerated and onboarded automatically, scoped by organizational unit (slide 45). The dashboard shows recently discovered and action-required counts with platform filters and per-agent detail; each agent is cataloged in full: tools, knowledge bases, guardrails, credentials, bindings and sub-agents (slide 58).', slide: 45 },
+  { id: 'review', claim: 'Permission review: each agent\'s execution identity is inspected against the provider (IAM policies for AWS, project IAM bindings for Google, ARM role assignments for Azure, named credentials for Agentforce, privileged flows for Copilot Studio). A five-level score is built from 46 specific findings: administrative privilege, publicly reachable and unauthenticated, over-privileged identity, lateral-movement and credential-exfiltration paths, dangling roles, missing guardrails, deprecated models and more (slide 45).', slide: 45 },
+  { id: 'ownership', claim: 'Ownership: every agent has a named custodian, so an orphaned agent has a named owner (slide 45). Every agent is classified and assigned a human custodian at creation or discovery; the custodian approves the agents and their policy assignments; when the custodian leaves or moves, agent transfer to a new custodian is triggered automatically (slide 19).', slide: 19 },
+  { id: 'audited', claim: 'Audited by design: operations are restricted to administrators and each agent\'s assigned custodian, and written to the audit log with the acting user. Every custodian action requires approval from a tenant administrator before it executes; only administrators act immediately (slide 45).', slide: 45 },
+  { id: 'remediation', claim: 'Remediation: delete on twelve of thirteen sources (Databricks in development) and quarantine on nine (the slide names Bedrock Agents and AgentCore, Lex, Vertex AI, Copilot Studio, Agentforce, Snowflake Cortex), plus targeted fixes: strip over-privileged roles, stop a privileged flow, disable a named credential, retag or reconfigure (slide 45).', slide: 45 },
+  { id: 'certify', claim: 'Certification campaigns for periodic review and approval of agent access (slide 18); campaigns certify agent entitlements (slide 58).', slide: 18 },
+  { id: 'safe-sync', claim: 'Safe sync: discovery distinguishes "this agent is gone" from "the provider did not answer". If any part of a sync fails, the run is [the rest of the line is cut off in the PDF] (slide 45).', slide: 45 },
+  { id: 'gateway', claim: 'Governing the gateway itself (NEW, on Bedrock AgentCore): the gateway is an object of policy, not just a route: enable or disable a tool target, switch the WAF between fail-open and fail-closed, close a bypass route, pin an endpoint, end a session, and flip enforcement from log-only to enforcing, the last behind a typed confirmation (slides 35 and 45).', slide: 45 },
+  { id: 'private', claim: 'Private-network discovery (NEW): a workload connector and scanner reach agents inside your own network and cloud accounts (Bedrock, AgentCore and Lex), polling outbound through your proxy (slides 35 and 45).', slide: 45 },
+];
+
+// What the deck itself leaves unresolved. Shown, not resolved.
+export const DISCREPANCIES = [
+  { id: 'risk-scoring', title: 'Risk scoring: slide 45 vs slide 21', text: 'Slide 45 describes a five-level risk score built from 46 findings as part of AI Platform Agents (ENHANCED, GA). Slide 21 lists "Risk Scoring" (outlier detection based on risky access and anomalous behaviour) as Planned. The deck does not say how the two relate: they may be different things (a finding-based score versus outlier detection), or the score may be only partly shipped. The lab does not resolve this: it shows a finding-based score, tags it, and claims nothing about outlier detection.' },
+  { id: 'nine', title: 'Quarantine: "nine" sources, seven names', text: 'Slide 45 says quarantine works on nine sources and names seven (Bedrock Agents and AgentCore, Lex, Vertex AI, Copilot Studio, Agentforce, Snowflake Cortex). The other two are not named. The lab supports quarantine on the seven named and, as a placeholder lab reading, on Google Agent Builder and Azure AI Foundry to make nine; those two are tagged lab reading.' },
+  { id: 'cut-off', title: 'Safe sync: the line is cut off in the PDF', text: 'The slide 45 sentence about what a run does after a partial failure is partly hidden in the PDF. The lab implements the safe behaviour (nothing is deleted; agents not seen are marked unknown, never gone) and labels it "lab reading of a partly-cut-off deck line", not the deck\'s words.' },
+  { id: 'naming', title: 'Slide 35 vs 57 naming', text: 'Slide 35 retires "Workload Agent Discovery & Control" in favour of "AI Platform Agents"; this lab follows slide 35.' },
+];
+
+// Slide 21 availability, plus the two items the deck shows without a tag. lab: what the lab models, honestly.
+export const AVAILABILITY = [
+  { capability: 'Platform Agent Discovery', availability: 'GA', lab: 'Modelled: the thirteen-source inventory and the safe sync.' },
+  { capability: 'Activity Collectors', availability: 'GA', lab: 'Not modelled.' },
+  { capability: 'Agent Delegated Administration', availability: 'GA', lab: 'Modelled as a lab reading: custodian operations limited to administrators and the agent\'s custodian, with approval by a different administrator.' },
+  { capability: 'Shadow AI Discovery with Agent Privilege', availability: 'Roadmap (Q4 2026)', lab: 'Not modelled. No behaviour is claimed.' },
+  { capability: 'Agent Lifecycle Management', availability: 'Roadmap (Q4 2026)', lab: 'Not modelled. No behaviour is claimed. (Delete and quarantine here are the slide 45 remediation, not lifecycle management.)' },
+  { capability: 'Agent Classification', availability: 'Roadmap (Q4 2026)', lab: 'No behaviour is claimed. The lab only reads an owner hint at discovery to name a custodian (lab reading of slide 19, not rule-based classification).' },
+  { capability: 'Custodian Management (rule-based assignment)', availability: 'Roadmap (Q4 2026)', lab: 'No behaviour is claimed. Custodians here come from an owner hint or are assigned by hand through an approved transfer.' },
+  { capability: 'Agent Events', availability: 'Roadmap (Q4 2026)', lab: 'Not modelled. No behaviour is claimed.' },
+  { capability: 'Access Visualization', availability: 'Planned', lab: 'Not modelled. No behaviour is claimed.' },
+  { capability: 'Risk Scoring (outlier detection on risky access and anomalous behaviour)', availability: 'Planned', lab: 'The lab shows a finding-based five-level score (slide 45) and tags it Planned; it claims nothing about outlier detection. See the discrepancy note.' },
+  { capability: 'Certification campaigns (slides 18 and 58)', availability: 'described in the deck, availability not stated', lab: 'Modelled as a clock-free state machine (lab reading).' },
+  { capability: 'Succession management (slide 19)', availability: 'described in the deck, availability not stated', lab: 'Modelled as proposed transfers that an administrator approves (lab reading).' },
+];
+
+export const NOT_DEMONSTRATED = [
+  'Anything about how the real console, a real cloud, a real provider API or a Workload Connector behaves: nothing here ran against one. The provider calls shown are illustrations on .example hosts that are never sent.',
+  'Ping\'s 46 findings: the deck does not list them. The lab\'s 13 findings and its scoring rule are its own.',
+  'How the deck\'s five-level score is computed, and whether it is the same thing as the Planned "Risk Scoring" on slide 21.',
+  'Which two sources besides the seven named make up the "nine" that support quarantine (placeholders here).',
+  'What the product does after a partial sync failure (the slide line is cut off); the lab\'s safe behaviour is a lab reading.',
+  'Activity Collectors, Shadow AI Discovery, Agent Lifecycle Management, rule-based classification and custodian assignment, Agent Events and Access Visualization: not modelled.',
+  'Slide 58\'s "policies flag conflicting access with preventative and detective scans" and "activity monitoring": not modelled.',
+  'The inner shapes of the AgentCore gateway JSON blobs (the schema gives only the field names), the product\'s real scorecard rules, its approval rules and its audit format.',
+  'Real authentication to any provider: the lab holds no credential for any of them; anything credential-shaped you type is masked and never kept.',
+];
+
+export const FIELD_SOURCE_NAMES = { deck: 'deck claim', swagger: 'console swagger name (schema only)', reading: 'lab reading', invented: 'lab-invented' };
+// Per field: where it comes from. A swagger name proves the field exists (console swagger, 2026-10-31, schema only), not how it behaves.
+export const FIELD_SOURCES = [
+  { field: 'The thirteen sources and their order', source: 'deck', note: 'Slide 45 lists them. The ids (BEDROCK, AGENTCORE, LEX, BEDROCKFLOW, VERTEXAI, AGENTBUILDER, AGENTREGISTRY, DIALOGFLOWCX, AIFOUNDRY, COPILOT, AGENTFORCE, DATABRICKS, SNOWFLAKE_CORTEX) are the values of the console swagger enum imodelAIAgentAccountSpec.Type (schema only).' },
+  { field: 'Inventory fields: identity, model, configuration, owner; deep anatomy (tools, knowledge bases, guardrails, credentials, bindings, sub-agents)', source: 'deck', note: 'Slides 45 and 58 name them. The record shape and every seeded value are lab-invented mock data on fake ids.' },
+  { field: 'Agent cards on Google Agent Registry agents', source: 'deck', note: 'Slide 45: A2A-native agents from the GCP Agent Registry carry their agent cards. The card fields shown are the lab\'s.' },
+  { field: 'AWS Organizations enumeration scoped by organizational unit', source: 'deck', note: 'Slide 45. The lab\'s organization, its two OUs and its accounts (000000000001 style fake ids) are invented; a new account in an onboarded OU is picked up at the next sync.' },
+  { field: 'Permission surface per source (IAM policies, project IAM bindings, ARM role assignments, named credentials, privileged flows)', source: 'deck', note: 'Slide 45. Databricks ("workspace grants") and Snowflake ("role grants") are not named by the deck: lab reading.' },
+  { field: 'Five levels, 46 findings', source: 'deck', note: 'Slide 45 says a five-level score is built from 46 specific findings and names some categories. The lab does not claim the 46.' },
+  { field: 'The 13 findings LF-01 to LF-13, their points, the level thresholds (0, 1-14, 15-34, 35-59, 60+) and the cap of 100', source: 'invented', note: 'Lab-written illustrative findings; each is a rule over the seeded data with a test that it fires and a near-miss that does not. The scoring rule is lab-invented.' },
+  { field: 'Custodian for every agent; an orphaned agent is flagged', source: 'deck', note: 'Slides 19 and 45. Assignment at discovery from an owner hint on the agent is a lab reading.' },
+  { field: 'Custodian operations restricted to administrators and the assigned custodian; written to the audit log with the acting user', source: 'deck', note: 'Slide 45. The roster (two administrators, three custodians, one member) is invented.' },
+  { field: 'Every custodian action needs administrator approval BEFORE it executes', source: 'deck', note: 'Slide 45. The three-step machine (propose, approve or deny, execute), self-approval refused, approve-after-deny refused and stale approvals refused are the lab\'s reading of how that could work.' },
+  { field: 'Remediation: delete on 12 of 13 (Databricks not), quarantine on 9', source: 'deck', note: 'Slide 45 names seven of the nine; the other two (Google Agent Builder, Azure AI Foundry) are lab reading placeholders.' },
+  { field: 'Targeted fixes: strip a role, stop a privileged flow, disable a named credential, retag, reconfigure', source: 'deck', note: 'Named on slide 45. The tag keys, the reconfigure fields and every effect on the score are lab-invented.' },
+  { field: 'Succession on custodian departure', source: 'reading', note: 'Slide 19 says transfer to a new custodian is triggered automatically. The lab proposes a transfer per agent and an administrator approves each one. Described in the deck, availability not stated.' },
+  { field: 'Certification campaign (pending, certified, revoke proposed, revoked, escalated)', source: 'reading', note: 'Slides 18 and 58. The states, the escalation of unreviewed items and the clock-free close are the lab\'s. Described in the deck, availability not stated.' },
+  { field: 'Safe sync: gone vs the provider did not answer', source: 'deck', note: 'Slide 45 states the distinction. What a run does after a partial failure is cut off in the PDF: the lab\'s rule (nothing deleted, unseen agents unknown) is a lab reading of a partly-cut-off deck line.' },
+  { field: 'Injected failure kinds (timeout, error, throttled) and the parts of a run (one per source and scope)', source: 'invented', note: 'Lab-invented, so the visitor can make a provider not answer.' },
+  { field: 'Gateway as an object of policy: target, WAF failure mode, bypass route, endpoint pin, session, log-only vs enforcing with a typed confirmation', source: 'deck', note: 'Slides 35 and 45. The typed confirmation on fail-closed is the lab\'s reading (the deck names it for the enforcing flip); only an administrator may act is also a lab reading.' },
+  { field: 'GatewayBypassPostureJSON, GatewayCallerAccessJSON, GatewayDetailJSON, GatewayEnginesJSON, GatewayScorecardJSON, BypassDiffJSON, RuntimeCallerAccessJSON, TargetCallerAccessJSON, Truncated', source: 'swagger', note: 'Fields of modelAgentCoreAccountMetadata (console swagger, 2026-10-31, schema only): each is a string whose inner shape the schema does not give, so every shape here is lab-invented (the schema gives only the field name). The twelve scorecard checks are the ones the swagger description lists; the rule for each is the lab\'s.' },
+  { field: 'modelPrivateNetworkTenantConfig { Enabled }', source: 'swagger', note: 'Lets the tenant add Private network connections and run a Workload Connector (console swagger description, schema only). A disabled tenant refusing to add a connection is the lab\'s reading.' },
+  { field: 'modelPrivateNetworkConfig { Enabled, ScannerRunsIn } on imodelAIAgentAccountSpec.PrivateNetwork', source: 'swagger', note: 'Enabled scans the connection through the Workload Scanner and is fixed once added; ScannerRunsIn is where the Scanner runs (an AWS account, Azure subscription or GCP project) and is the same for every connection one Scanner serves. The { kind, id } form of ScannerRunsIn, the scanner id, the scope and source lists on a connection and the poll log are lab-invented.' },
+  { field: 'Workload Connector polling outbound through your proxy', source: 'deck', note: 'Slides 35 and 45. The poll log is simulated: the lab makes no network call. The "inbound: 0" figure is counted from that log, and the log is outbound by construction in the lab\'s model, so it is an illustration, not proof about the product.' },
+  { field: 'The lab\'s logical time (no clock), run ids, proposal ids, three vertical packs', source: 'invented', note: 'Audit times are logical (one minute per entry from a fixed start). The people, agents and accounts are synthetic.' },
+];
+
+export const LIMITS_TEXT = 'Limits: a reason is at most 300 characters and a comment 200 (credential-shaped text is masked); a workspace keeps at most 200 proposals (an agent at most 5 open), 500 audit entries, 30 sync runs, 5 campaigns, 10 private-network connections and 50 connector polls (a full workspace refuses new work: Reset); a sync takes at most 20 injected failures; an agent carries at most 6 tags; one response shows at most 40 hops. A request that would break a limit is refused whole, never trimmed.';
+
+export const WHY = {
+  id: 'why-platform-agents',
+  title: 'Why it matters: AI Platform Agents (slide 45)',
+  challenge: 'Agents created in cloud consoles sit outside identity processes: nobody inventoried them and nobody knows what they reach. Each over-privileged agent is a silent breach path that no current review covers.',
+  technical: 'Cross-cloud inventory, permission review, 46-finding risk scores and one console to fix or delete.',
+  business: 'Cuts agent-audit effort sharply and closes exfiltration paths before they are exploited.',
+};
+export const WHY_TEXT = `Challenge: ${WHY.challenge} Technical: ${WHY.technical} Business: ${WHY.business} (Ping claims, unverified on our tenant. Per the deck, slide 45.)`;
+
+export const TALK_TRACK = [
+  { id: 'say-first', title: 'Start with the problem', say: 'Agents created in cloud consoles sit outside identity processes: nobody inventoried them and nobody knows what they reach. Each over-privileged agent is a silent breach path that no current review covers. (Ping\'s challenge text, slide 45. {{castBrand}} has agents in AWS, Google, Azure and three SaaS platforms.)' },
+  { id: 'inventory', title: 'One inventory across thirteen sources', say: 'The dashboard shows what was recently discovered, what needs action and a filter per platform. Open {{castDomain1}}-assistant: its identity, model, configuration, tools, knowledge bases, guardrails, credentials, bindings and sub-agents are all on one page. Agents from the Google Agent Registry carry their A2A agent cards, and AWS member accounts are onboarded by organizational unit.' },
+  { id: 'review', title: 'Permission review and a risk score', say: 'Each agent\'s execution identity is read against its provider. The deck says Ping builds a five-level score from 46 findings; the lab ships 13 of its own and says so. Notice the deck itself lists Risk Scoring as Planned on slide 21: we show the score, tag it, and do not pretend to resolve that.' },
+  { id: 'ownership', title: 'Every agent has a custodian, and every action is approved', say: 'An orphaned agent is flagged. {{castCustodian}} proposes quarantining an agent. Nobody approves their own proposal and a custodian cannot approve at all: only a tenant administrator can, and never the proposer. {{castAdmin}} approves, then it runs, and the audit log names who did each step. Stale approvals are refused if the agent changed in between.' },
+  { id: 'remediate', title: 'Remediation that follows the source', say: 'Delete works on twelve sources and not on Databricks, which the deck says is in development. Quarantine works on nine. Beside them are targeted fixes: strip a role, stop a privileged flow, disable a named credential, retag or reconfigure, and the score drops because the rule no longer fires.' },
+  { id: 'succession', title: 'Succession and certification', say: 'When a custodian leaves, a transfer is proposed for each agent and an administrator approves each one. A certification campaign asks each custodian to certify or revoke; unreviewed items escalate. Both appear in the deck without an availability tag, and the lab says so.' },
+  { id: 'sync', title: 'A sync that never mistakes silence for deletion', say: 'Run a sync with one provider failing. The lab deletes nothing and marks the agents it could not see as unknown, not gone. Run it again without the failure and an agent really removed in the console is marked gone. The deck line about what a run does after a partial failure is cut off, so this is our reading, labelled.' },
+  { id: 'gateway', title: 'The gateway is itself an object of policy', say: 'On the AgentCore tab, enable or disable a tool target, switch the WAF between fail-open and fail-closed, close a bypass route and see who was only reachable through it, pin an endpoint, end a session, and flip log-only to enforcing, which needs the gateway name typed in. The scorecard of twelve checks moves with each change.' },
+  { id: 'private', title: 'Agents inside your own network', say: 'A workload connector and scanner reach agents inside your network and cloud accounts, polling outbound through your proxy: nothing dials in. A tenant that has not enabled Private network cannot add a connection, Enabled is fixed once a connection is added, and every finding carries where the scanner runs.' },
+  { id: 'why-platform-agents', title: WHY.title, say: WHY_TEXT },
+];
+
+export const PRESENTER_TALK = { inventory: ['say-first', 'inventory'], review: ['review'], ownership: ['ownership', 'remediate', 'succession'], sync: ['sync'], gateway: ['gateway'], private: ['private'], diagram: ['why-platform-agents'] };

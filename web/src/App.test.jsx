@@ -1,0 +1,446 @@
+// These tests drive the real UI against the real Express app (started on a loopback port inside the test), so a green run means the pieces
+// actually work together: the real story data, the real engine, the real Mock table.
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { createApp, startHttpServer } from "../../server/src/app.js";
+import { createHealth } from "../../server/src/health.js";
+import { VERTICALS } from "../../server/src/cast.js";
+import App, { BANNER_UNKNOWN, TABS } from "./App";
+import { labelOffsets } from "./components/PatternDiagram";
+import { visible } from "./safeText";
+import { forgetWorkspace } from "./workspace";
+
+const C = VERTICALS.finance;
+let server; let base; const realFetch = globalThis.fetch; let seen = [];
+let delay = () => 0;
+beforeAll(async () => {
+  const health = createHealth({ runChecks: async () => [], intervalMs: 3_600_000 });
+  ({ server, url: base } = await startHttpServer({ port: 0, host: "127.0.0.1", app: createApp({ health, configFile: "/nonexistent/customer.config.json" }) }));
+  base = base.replace(/\/$/, "");
+  globalThis.fetch = async (u, init = {}) => {
+    const url = typeof u === "string" && u.startsWith("/") ? `${base}${u}` : u;
+    seen.push({ url: String(url), body: typeof init.body === "string" ? init.body : "" });
+    const ms = delay(String(url), init); if (ms) await new Promise((r) => setTimeout(r, ms));
+    return realFetch(url, { ...init, headers: { origin: base, ...(init.headers || {}) } });
+  };
+});
+afterAll(async () => { globalThis.fetch = realFetch; await new Promise((r) => server.close(r)); });
+beforeEach(() => { cleanup(); forgetWorkspace(); seen = []; delay = () => 0; try { window.localStorage.clear(); window.sessionStorage.clear(); } catch { /* ignore */ } window.location.hash = ""; });
+
+const T = { timeout: 20000 };
+const mount = async () => { render(<App />); await screen.findByTestId("scenarios", {}, T); };
+const tab = (name) => userEvent.click(screen.getByRole("tab", { name }));
+const click = (id) => userEvent.click(screen.getByTestId(id));
+const live = async () => { await click("mode-live"); await waitFor(() => expect(screen.getByTestId("banner")).toHaveTextContent(/LIVE mode/)); await screen.findByTestId("actor", {}, T); await waitFor(() => expect(screen.getByTestId("tile-live")).toHaveTextContent("23"), T); };
+const setValue = (id, value) => fireEvent.change(screen.getByTestId(id), { target: { value } });
+const pick = (id, value) => userEvent.selectOptions(screen.getByTestId(id), value);
+const actAs = (who) => pick("actor", who);
+const idle = () => waitFor(() => expect(screen.getByTestId("reset")).toBeEnabled(), T);
+const wholePageText = () => { const c = document.body.cloneNode(true); c.querySelectorAll("textarea,input").forEach((n) => n.remove()); return c.textContent; };
+// Propose quarantine of an agent as a person, wait for the answer.
+const proposeQuarantine = async (agentId, who) => {
+  await tab("Ownership"); await screen.findByTestId("propose-panel", {}, T);
+  await actAs(who);
+  await waitFor(() => expect(screen.getByTestId("p-agent")).toBeInTheDocument(), T);
+  await pick("p-agent", agentId); await pick("p-kind", "quarantine");
+  await waitFor(() => expect(screen.getByTestId("propose")).toBeEnabled(), T);
+  await click("propose");
+  await waitFor(() => expect(screen.getByTestId("last-action")).toHaveTextContent(/POST \/api\/proposals/), T);
+};
+
+describe("shell", () => {
+  it("says it is simulated and UNVERIFIED on every tab, in presenter mode too, and shows the mode", async () => {
+    await mount();
+    expect(screen.getByTestId("banner")).toHaveTextContent(/MOCK mode/);
+    expect(screen.getByTestId("mode")).toHaveTextContent("Mode: mock");
+    for (const t of TABS) {
+      await tab(t.label);
+      expect(screen.getByTestId("banner")).toHaveTextContent(/UNVERIFIED on our tenant/);
+      expect((await screen.findAllByTestId("claim-tag", {}, T)).length).toBeGreaterThan(0);
+    }
+    await tab("Inventory");
+    await userEvent.keyboard("p");
+    expect(screen.getByTestId("presenter-say")).toBeInTheDocument();
+    expect(screen.getByTestId("banner")).toHaveTextContent(/SIMULATED/);
+    expect(screen.getByTestId("banner")).toHaveTextContent(/UNVERIFIED on our tenant/);
+    expect(screen.getByTestId("presenter")).toHaveTextContent("Exit presenter");
+    for (const t of TABS.filter((x) => x.id !== "talk")) { await tab(t.label); expect(screen.getByTestId("presenter-say")).toBeInTheDocument(); expect(screen.getByTestId("banner")).toHaveTextContent(/UNVERIFIED/); }
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByTestId("presenter-say")).toBeNull();
+    expect(BANNER_UNKNOWN).toMatch(/UNVERIFIED/);
+  });
+
+  it("the banner and the mode chip follow the toggle, in both directions, on every tab", async () => {
+    await mount();
+    for (const t of TABS) {
+      await tab(t.label);
+      await click("mode-live"); await waitFor(() => expect(screen.getByTestId("banner")).toHaveTextContent(/LIVE mode/)); expect(screen.getByTestId("mode")).toHaveTextContent("Mode: live");
+      await click("mode-mock"); await waitFor(() => expect(screen.getByTestId("banner")).toHaveTextContent(/MOCK mode/)); expect(screen.getByTestId("mode")).toHaveTextContent("Mode: mock");
+    }
+  });
+
+  it("the choice of mode is remembered, and a blocked storage never breaks the page", async () => {
+    await mount(); await click("mode-live");
+    expect(window.localStorage.getItem("agl.mode")).toBe("live");
+    cleanup(); render(<App />); await waitFor(() => expect(screen.getByTestId("banner")).toHaveTextContent(/LIVE mode/), T);
+    cleanup(); const desc = Object.getOwnPropertyDescriptor(window, "localStorage");
+    Object.defineProperty(window, "localStorage", { configurable: true, get() { throw new Error("blocked"); } });
+    try { render(<App />); await waitFor(() => expect(screen.getByTestId("banner")).toHaveTextContent(/MOCK mode/), T); await click("mode-live"); await waitFor(() => expect(screen.getByTestId("banner")).toHaveTextContent(/LIVE mode/), T); }
+    finally { Object.defineProperty(window, "localStorage", desc); }
+  });
+
+  it("arrow keys move between tabs, and the URL hash follows", async () => {
+    await mount();
+    screen.getByRole("tab", { name: "Inventory" }).focus();
+    await userEvent.keyboard("{ArrowRight}");
+    expect(screen.getByRole("tab", { name: "Permission review" })).toHaveAttribute("aria-selected", "true");
+    expect(window.location.hash).toBe("#review");
+    await userEvent.keyboard("{ArrowLeft}{ArrowLeft}");
+    expect(screen.getByRole("tab", { name: "Talk track" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("talks only to its own origin", async () => {
+    await mount(); await live(); await tab("Safe sync"); await tab("Diagram");
+    expect(seen.length).toBeGreaterThan(3);
+    for (const s of seen) expect(s.url.startsWith(base) || s.url.startsWith("/")).toBe(true);
+  });
+});
+
+describe("Mock mode: eight scripted scenarios, read-only", () => {
+  it("shows a scenario and its steps; switching scenario changes the state every tab shows", async () => {
+    await mount();
+    expect(screen.getByTestId("tile-live")).toHaveTextContent("23");
+    expect((await within(screen.getByTestId("scenarios")).findAllByRole("option")).length).toBe(8);
+    await pick("scenarios", "partial-failure");
+    await waitFor(() => expect(screen.getByTestId("scenario-say")).toHaveTextContent(/deletes nothing/), T);
+    await waitFor(() => expect(screen.getByTestId("tile-live")).toHaveTextContent("25"), T);
+    await tab("Safe sync");
+    await waitFor(() => expect(screen.getByTestId("run-result")).toHaveTextContent(/run-0004/), T);
+    expect(screen.getByTestId("runs")).toHaveTextContent(/partial/);
+  });
+
+  it("every write control is off in Mock, and a note says to switch to Live", async () => {
+    await mount();
+    for (const [name, ids, note] of [["Inventory", ["ou-ou-lab-prod"], null], ["Ownership", ["propose", "depart", "campaign-start"], "read-only-note"], ["Safe sync", ["run-sync", "console-flip", "fail-lex"], "read-only-note"], ["AgentCore gateway", ["to-enforce", "pin"], "read-only-note"], ["Private network", ["tenant-toggle", "c-add", "poll"], "read-only-note"]]) {
+      await tab(name);
+      await waitFor(() => expect(screen.getByTestId(ids[0])).toBeInTheDocument(), T);
+      for (const id of ids) expect(screen.getByTestId(id)).toBeDisabled();
+      if (note) expect(screen.getByTestId(note)).toHaveTextContent(/Mock only reads tables/);
+    }
+  });
+});
+
+describe("Inventory", () => {
+  it("the dashboard counts, the thirteen platform filters and the per-agent anatomy", async () => {
+    await mount(); await live();
+    expect(screen.getByTestId("tile-action")).toHaveTextContent("7");
+    expect(screen.getByTestId("tile-orphaned")).toHaveTextContent("2");
+    expect(screen.getByTestId("tile-recent")).toHaveTextContent("23");
+    expect(screen.getAllByRole("button").filter((b) => /^filter-/.test(b.dataset.testid || "")).length).toBe(14);
+    await click("filter-lex");
+    expect(within(screen.getByTestId("agents")).getAllByRole("row").length).toBe(2); // header + one agent
+    await click("filter-all"); await click("filter-action");
+    expect(within(screen.getByTestId("agents")).getAllByRole("row").length).toBe(8);
+    await click("filter-action");
+    await click("open-ag-agentbuilder-01");
+    const d = screen.getByTestId("agent-detail");
+    for (const w of ["Execution identity", "Tools", "Knowledge bases", "Guardrails", "Credentials", "Bindings", "Sub-agents"]) expect(d).toHaveTextContent(w);
+    expect(d).toHaveTextContent("ag-ghost-99");
+    await click("open-ag-agentregistry-01");
+    expect(screen.getByTestId("agent-card")).toHaveTextContent(/a2a/i);
+    await click("filter-level"); // a select: pick the level through its own control
+    await pick("filter-level", "4");
+    expect(within(screen.getByTestId("agents")).getAllByRole("row").length).toBe(7);
+  });
+
+  it("AWS Organizations: the sandbox OU is onboarded by the visitor and its account and agent show up at the next sync", async () => {
+    await mount(); await live();
+    expect(screen.getByTestId("account-000000000003")).toHaveTextContent(/not onboarded/);
+    await click("ou-ou-lab-sandbox");
+    await waitFor(() => expect(screen.getByTestId("account-000000000003")).toHaveTextContent(/onboarded/), T);
+    expect(screen.getByTestId("account-000000000003")).not.toHaveTextContent(/not onboarded/);
+    await tab("Safe sync"); await waitFor(() => expect(screen.getByTestId("run-sync")).toBeEnabled(), T);
+    await click("run-sync"); await waitFor(() => expect(screen.getByTestId("run-result")).toHaveTextContent(/run-0002/), T);
+    await tab("Inventory"); await waitFor(() => expect(screen.getByTestId("tile-live")).toHaveTextContent("27"), T); // 23 + 3 new + the sandbox agent
+    expect(screen.getByTestId("agent-ag-bedrockflow-02")).toBeInTheDocument();
+  });
+
+  it("the availability table tags every slide 21 line, and Roadmap and Planned lines say no behaviour is claimed", async () => {
+    await mount();
+    const a = screen.getByTestId("availability"); fireEvent.click(within(a).getByText(/What is available/));
+    const tags = within(a).getAllByTestId("avail-tag").map((n) => n.textContent);
+    expect(tags.filter((t) => t === "GA").length).toBe(3); expect(tags.filter((t) => t === "Roadmap (Q4 2026)").length).toBe(5); expect(tags.filter((t) => t === "Planned").length).toBe(2);
+    expect(tags.filter((t) => /availability not stated/.test(t)).length).toBe(2);
+    expect(a).toHaveTextContent(/No behaviour is claimed/);
+  });
+});
+
+describe("Permission review", () => {
+  it("shows the Risk Scoring discrepancy, the deck's numbers beside the lab's, the 13 lab-written findings, and filters by level", async () => {
+    await mount(); await tab("Permission review");
+    const d = await screen.findByTestId("risk-discrepancy", {}, T);
+    expect(d).toHaveTextContent(/Slide 45 describes a five-level risk score/); expect(d).toHaveTextContent(/lists "Risk Scoring".*as Planned/); expect(d).toHaveTextContent(/does not resolve/);
+    expect(screen.getByTestId("deck-vs-lab")).toHaveTextContent(/13 sources, 46 findings, 5 levels/);
+    expect(within(screen.getByTestId("findings-catalog")).getAllByRole("row").length).toBe(14);
+    expect(screen.getByTestId("review-ag-bedrock-02")).toHaveTextContent(/LF-01/);
+    await pick("review-min", "4");
+    expect(screen.queryByTestId("review-ag-bedrock-01")).toBeNull(); expect(screen.getByTestId("review-ag-bedrock-02")).toBeInTheDocument();
+  });
+});
+
+describe("Ownership (Live): propose, approve, execute, and the refusals", () => {
+  it("a custodian proposes, cannot approve, an administrator approves, it executes, and the audit log names who did each step", async () => {
+    await mount(); await live();
+    await proposeQuarantine("ag-bedrock-02", C.castCustodian);
+    await waitFor(() => expect(screen.getByTestId("proposal-prop-0001")).toHaveTextContent(/proposed/), T);
+    // the custodian tries to approve: refused
+    await click("approve-prop-0001");
+    await waitFor(() => expect(screen.getByTestId("last-action")).toHaveTextContent(/refused \(admin_only\)/), T);
+    expect(screen.getByTestId("proposal-prop-0001")).toHaveTextContent(/proposed/);
+    // executing before approval is refused
+    await actAs(C.castAdmin); await idle();
+    // the administrator who did not propose approves
+    await click("approve-prop-0001");
+    await waitFor(() => expect(screen.getByTestId("proposal-prop-0001")).toHaveTextContent(/approved/), T);
+    await click("execute-prop-0001");
+    await waitFor(() => expect(screen.getByTestId("proposal-prop-0001")).toHaveTextContent(/executed/), T);
+    const audit = screen.getByTestId("audit");
+    expect(audit).toHaveTextContent(/proposal.created/); expect(audit).toHaveTextContent(/proposal.executed/); expect(audit).toHaveTextContent(C.castAdmin); expect(audit).toHaveTextContent(C.castCustodian);
+    await tab("Inventory"); await click("open-ag-bedrock-02");
+    expect(screen.getByTestId("agent-detail")).toHaveTextContent(/inert/);
+    expect(screen.getByTestId("agent-ag-bedrock-02")).toHaveTextContent(/quarantined/);
+  }, 120000);
+
+  it("an administrator cannot approve their own proposal: the refusal is shown; the other administrator can", async () => {
+    await mount(); await live();
+    await proposeQuarantine("ag-bedrock-01", C.castAdmin);
+    await click("approve-prop-0001");
+    await waitFor(() => expect(screen.getByTestId("last-action")).toHaveTextContent(/refused \(self_approval\)/), T);
+    expect(screen.getByTestId("proposal-prop-0001")).toHaveTextContent(/proposed/);
+    await actAs(C.castAdmin2); await click("approve-prop-0001");
+    await waitFor(() => expect(screen.getByTestId("proposal-prop-0001")).toHaveTextContent(/approved/), T);
+    expect(screen.getByTestId("proposal-prop-0001")).toHaveTextContent(C.castAdmin2);
+  }, 60000);
+
+  it("approve after deny is refused, and delete is refused on Databricks", async () => {
+    await mount(); await live();
+    await proposeQuarantine("ag-bedrock-02", C.castAdmin);
+    await actAs(C.castAdmin2); await click("deny-prop-0001");
+    await waitFor(() => expect(screen.getByTestId("proposal-prop-0001")).toHaveTextContent(/denied/), T);
+    expect(screen.queryByTestId("approve-prop-0001")).toBeNull();
+    await actAs(C.castAdmin); await pick("p-agent", "ag-databricks-01"); await pick("p-kind", "delete");
+    await click("propose");
+    await waitFor(() => expect(screen.getByTestId("last-action")).toHaveTextContent(/refused \(unsupported_on_source\)/), T);
+    expect(screen.getByTestId("remediation")).toHaveTextContent(/no \(in development\)/);
+  }, 60000);
+
+  it("a credential typed as the reason or a tag value is masked everywhere on the page and in the hops", async () => {
+    await mount(); await live();
+    const secret = ["gh", "p_", "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8"].join("");
+    await tab("Ownership"); await screen.findByTestId("propose-panel", {}, T);
+    await actAs(C.castCustodian); await pick("p-agent", "ag-bedrock-01"); await pick("p-kind", "retag");
+    setValue("p-tagvalue", `v ${secret}`); setValue("p-reason", `because ${secret}`);
+    await waitFor(() => expect(screen.getByTestId("propose")).toBeEnabled(), T);
+    await click("propose");
+    await waitFor(() => expect(screen.getByTestId("proposal-prop-0001")).toBeInTheDocument(), T);
+    expect(wholePageText()).not.toContain(secret);
+    expect(wholePageText()).toMatch(/\[masked:/);
+    fireEvent.click(within(screen.getByTestId("hops")).getByText(/Raw hops/));
+    expect(wholePageText()).not.toContain(secret);
+    expect(seen.some((s) => s.body.includes(secret))).toBe(true); // it was sent, and never came back
+  }, 60000);
+
+  it("succession and a certification campaign: a departure proposes transfers, a campaign escalates what nobody reviewed", async () => {
+    await mount(); await live();
+    await tab("Ownership"); await screen.findByTestId("succession", {}, T);
+    await pick("leaver", C.castCustodian2); await waitFor(() => expect(screen.getByTestId("depart")).toBeEnabled(), T);
+    await click("depart");
+    await waitFor(() => expect(screen.getByTestId("proposal-prop-0006")).toHaveTextContent(/succession/), T);
+    await click("campaign-start");
+    await waitFor(() => expect(screen.getByTestId("campaign-items")).toHaveTextContent(/camp-0001 \(open\)/), T);
+    await actAs(C.castCustodian); await click("certify-ci-0001");
+    await waitFor(() => expect(screen.getByTestId("item-ci-0001")).toHaveTextContent(/certified/), T);
+    await actAs(C.castAdmin); await click("campaign-close");
+    await waitFor(() => expect(screen.getByTestId("campaign-items")).toHaveTextContent(/camp-0001 \(closed\)/), T);
+    expect(screen.getByTestId("item-ci-0003")).toHaveTextContent(/escalated/);
+    expect(screen.getByTestId("succession")).toHaveTextContent(/availability not stated/); expect(screen.getByTestId("campaign")).toHaveTextContent(/availability not stated/);
+  }, 90000);
+});
+
+describe("Safe sync", () => {
+  it("a partial sync marks agents unknown and deletes nothing; a complete sync then marks the really removed one gone", async () => {
+    await mount(); await live(); await tab("Safe sync");
+    await waitFor(() => expect(screen.getByTestId("run-sync")).toBeEnabled(), T);
+    await click("run-sync"); await waitFor(() => expect(screen.getByTestId("run-result")).toHaveTextContent(/run-0002/), T);
+    await pick("console-agent", "ag-lex-01"); await click("console-flip");
+    await waitFor(() => expect(screen.getByTestId("console-agent")).toHaveTextContent(/removed at the provider/), T);
+    await click("fail-vertexai");
+    await click("run-sync");
+    await waitFor(() => expect(screen.getByTestId("run-result")).toHaveTextContent(/run-0003/), T);
+    expect(screen.getByTestId("run-result")).toHaveAttribute("data-state", "warn");
+    expect(screen.getByTestId("partial-note")).toHaveTextContent(/nothing was deleted/);
+    expect(screen.getByTestId("run-counts")).toHaveTextContent(/marked gone: 0/); expect(screen.getByTestId("run-counts")).toHaveTextContent(/marked unknown: 4/);
+    expect(screen.getByTestId("run-counts")).toHaveTextContent(/Removed from the provider by this run: 0; inventory records removed: 0/);
+    expect(within(screen.getByTestId("parts")).getAllByText("failed").length).toBeGreaterThan(0);
+    await click("fail-vertexai"); await click("run-sync");
+    await waitFor(() => expect(screen.getByTestId("run-result")).toHaveTextContent(/run-0004/), T);
+    expect(screen.getByTestId("run-counts")).toHaveTextContent(/marked gone: 1/); expect(screen.getByTestId("run-counts")).toHaveTextContent(/recovered: 4|recovered: 3/);
+    expect(screen.getByTestId("run-result")).toHaveAttribute("data-state", "ok");
+    expect(wholePageText()).toMatch(/lab reading of a partly-cut-off deck line/);
+  }, 120000);
+});
+
+describe("AgentCore gateway", () => {
+  it("a wrong typed confirmation changes nothing; the gateway name flips to ENFORCE and the scorecard moves", async () => {
+    await mount(); await live(); await tab("AgentCore gateway");
+    await waitFor(() => expect(screen.getByTestId("to-enforce")).toBeEnabled(), T);
+    const before = Number(screen.getByTestId("green-count").textContent);
+    setValue("typed", "wrong name"); await click("to-enforce");
+    await waitFor(() => expect(screen.getByTestId("last-action")).toHaveTextContent(/refused \(confirmation_mismatch\)/), T);
+    expect(screen.getByTestId("engine-mode")).toHaveTextContent("LOG_ONLY");
+    setValue("typed", `${C.castDomain1}-gateway`); await click("to-enforce");
+    await waitFor(() => expect(screen.getByTestId("engine-mode")).toHaveTextContent("ENFORCE"), T);
+    expect(Number(screen.getByTestId("green-count").textContent)).toBe(before + 1);
+    expect(screen.getByTestId("check-enforcement")).toHaveTextContent(/green/);
+    expect(wholePageText()).not.toContain("wrong name");
+  }, 60000);
+
+  it("close a bypass route shows the before and after diff and who is locked out; disable a target; pin an endpoint; end a session", async () => {
+    await mount(); await live(); await tab("AgentCore gateway");
+    await waitFor(() => expect(screen.getByTestId("close-rt-1")).toBeEnabled(), T);
+    await click("close-rt-1");
+    const diff = await screen.findByTestId("bypass-diff", {}, T);
+    expect(diff).toHaveTextContent(/role-lab-batch-job/); expect(diff).toHaveTextContent(/now have none/);
+    expect(screen.getByTestId("check-bypass-closed")).toHaveTextContent(/green/);
+    await click("toggle-tg-2"); await waitFor(() => expect(screen.getByTestId("target-tg-2")).toHaveTextContent(/disabled/), T);
+    setValue("endpoint", "https://example.com"); await click("pin");
+    await waitFor(() => expect(screen.getByTestId("last-action")).toHaveTextContent(/refused \(bad_endpoint\)/), T);
+    setValue("endpoint", "https://gw1.fabrikam.example"); await click("pin");
+    await waitFor(() => expect(screen.getByTestId("pinned")).toHaveTextContent("https://gw1.fabrikam.example"), T);
+    await click("end-s-0002"); await waitFor(() => expect(screen.queryByTestId("session-s-0002")).toBeNull(), T);
+    await click("to-closed"); await waitFor(() => expect(screen.getByTestId("last-action")).toHaveTextContent(/refused \(confirmation_mismatch\)/), T);
+    expect(screen.getByTestId("waf-mode")).toHaveTextContent("open");
+  }, 90000);
+
+  it("the nine metadata fields are named, tagged lab-invented, and Truncated is computed", async () => {
+    await mount(); await tab("AgentCore gateway");
+    const m = await screen.findByTestId("metadata", {}, T);
+    for (const n of ["GatewayDetailJSON", "GatewayEnginesJSON", "GatewayScorecardJSON", "GatewayBypassPostureJSON", "GatewayCallerAccessJSON", "RuntimeCallerAccessJSON", "BypassDiffJSON", "TargetCallerAccessJSON"]) expect(m).toHaveTextContent(n);
+    expect(m).toHaveTextContent(/lab-invented \(the schema gives only the field name\)/); expect(screen.getByTestId("truncated")).toHaveTextContent("false");
+  });
+});
+
+describe("Private network", () => {
+  it("a disabled tenant refuses; enabling lets a connection be added; Enabled is fixed; the connector only dials out; the scan finds the private agents with the scanner location", async () => {
+    await mount(); await live(); await tab("Private network");
+    await waitFor(() => expect(screen.getByTestId("c-add")).toBeEnabled(), T);
+    await click("c-add");
+    await waitFor(() => expect(screen.getByTestId("last-action")).toHaveTextContent(/refused \(private_network_disabled\)/), T);
+    expect(screen.getByTestId("tenant-state")).toHaveTextContent("disabled");
+    await click("tenant-toggle"); await waitFor(() => expect(screen.getByTestId("tenant-state")).toHaveTextContent("enabled"), T);
+    await click("c-add"); await waitFor(() => expect(screen.getByTestId("conn-conn-001")).toBeInTheDocument(), T);
+    await click("flip-conn-001"); await waitFor(() => expect(screen.getByTestId("last-action")).toHaveTextContent(/refused \(enabled_is_fixed\)/), T);
+    await click("poll"); await waitFor(() => expect(screen.getByTestId("outbound")).toHaveTextContent("1"), T);
+    expect(screen.getByTestId("inbound")).toHaveTextContent("0"); expect(screen.getByTestId("connector")).toHaveTextContent(/illustrates the deck's claim; it is not proof/);
+    await click("scan");
+    await waitFor(() => expect(screen.getByTestId("found-ag-lex-02")).toBeInTheDocument(), T);
+    expect(screen.getByTestId("found-ag-lex-02")).toHaveTextContent(/aws-account 000000000009/);
+    await tab("Permission review"); await pick("review-min", "1");
+    await waitFor(() => expect(screen.getByTestId("review-ag-agentcore-02")).toHaveTextContent(/found by the scanner in aws-account 000000000009/), T);
+  }, 120000);
+
+  it("a bad scanner location is refused, and a second connection on the same scanner must run in the same place", async () => {
+    await mount(); await live(); await tab("Private network");
+    await waitFor(() => expect(screen.getByTestId("tenant-toggle")).toBeEnabled(), T);
+    await click("tenant-toggle"); await waitFor(() => expect(screen.getByTestId("tenant-state")).toHaveTextContent("enabled"), T);
+    setValue("c-where", "12345"); await click("c-add");
+    await waitFor(() => expect(screen.getByTestId("last-action")).toHaveTextContent(/refused \(bad_scanner_location\)/), T);
+    setValue("c-where", "000000000009"); await click("c-add"); await waitFor(() => expect(screen.getByTestId("conn-conn-001")).toBeInTheDocument(), T);
+    setValue("c-where", "000000000008"); await click("c-add");
+    await waitFor(() => expect(screen.getByTestId("last-action")).toHaveTextContent(/refused \(scanner_location_mismatch\)/), T);
+    expect(screen.queryByTestId("conn-conn-002")).toBeNull();
+  }, 90000);
+});
+
+describe("Diagram, talk track, Reset", () => {
+  it("Diagram: the three diagrams load from data, Simulate walks the arrows, Reset restores", async () => {
+    await mount(); await tab("Diagram");
+    await screen.findByTestId("pattern-canvas", {}, T);
+    expect(screen.getByRole("heading", { name: /Discover, review, own, approve, remediate/ })).toBeInTheDocument();
+    expect(screen.getByTestId("pattern-step-bar")).toHaveTextContent(/Simulate walks the 9 arrows/);
+    await click("simulate"); await waitFor(() => expect(screen.getByTestId("pattern-now")).toHaveTextContent(/Step 1/), T);
+    await click("dg-safe-sync"); await waitFor(() => expect(screen.getByRole("heading", { name: /Safe sync: gone versus did not answer/ })).toBeInTheDocument(), T);
+    await waitFor(() => expect(screen.getByTestId("pattern-step-bar")).toHaveTextContent(/Simulate walks the 6 arrows/), T);
+    await click("dg-private-network-discovery"); await waitFor(() => expect(screen.getByTestId("pattern-step-bar")).toHaveTextContent(/Simulate walks the 7 arrows/), T);
+    await click("simulate"); await waitFor(() => expect(screen.getByTestId("pattern-now")).toBeInTheDocument(), T);
+    await click("pattern-reset"); await waitFor(() => expect(screen.queryByTestId("pattern-now")).toBeNull(), T);
+    expect(screen.getByTestId("speed")).toBeInTheDocument();
+  });
+
+  it("the edge-label offsets nudge a reply apart from the arrow it answers", () => {
+    expect(labelOffsets([{ from: "a", to: "b" }, { from: "b", to: "a" }, { from: "a", to: "c" }])).toEqual([-16, 16, 0]);
+  });
+
+  it("Talk track has the Why it matters entry marked as Ping claims", async () => {
+    await mount(); await tab("Talk track");
+    const t = await screen.findByTestId("talk-track", {}, T);
+    expect(t).toHaveTextContent(/Why it matters: AI Platform Agents/); expect(t).toHaveTextContent(/Challenge:/); expect(t).toHaveTextContent(/Technical:/); expect(t).toHaveTextContent(/Business:/); expect(t).toHaveTextContent(/Ping claims, unverified on our tenant/);
+  });
+
+  it("the vertical switch reloads the cast: names change in the story, the roster and the agents", async () => {
+    await mount(); await live(); await tab("Ownership");
+    expect(screen.getByTestId("roster")).toHaveTextContent(C.castCustodian);
+    await pick("vertical", "health");
+    await waitFor(() => expect(screen.getByTestId("roster")).toHaveTextContent(VERTICALS.health.castCustodian), T);
+    expect(screen.getByTestId("roster")).not.toHaveTextContent(C.castCustodian);
+  });
+
+  it("Reset clears proposals in Live and the page reloads; another workspace is not touched", async () => {
+    await mount(); await live();
+    await proposeQuarantine("ag-bedrock-02", C.castCustodian);
+    await waitFor(() => expect(screen.getByTestId("proposal-prop-0001")).toBeInTheDocument(), T);
+    const other = await realFetch(`${base}/api/proposals`, { method: "POST", headers: { "content-type": "application/json", origin: base, "x-workspace": "other-ws" }, body: JSON.stringify({ mode: "live", vertical: "finance", proposal: { actor: C.castAdmin, agentId: "ag-bedrock-01", kind: "quarantine" } }) });
+    expect(other.status).toBe(200);
+    await click("reset");
+    await waitFor(() => expect(screen.queryByTestId("proposal-prop-0001")).toBeNull(), T);
+    expect(screen.getByTestId("proposals-panel")).toHaveTextContent(/No proposals yet/);
+    const st = await (await realFetch(`${base}/api/state?mode=live`, { headers: { "x-workspace": "other-ws" } })).json();
+    expect(st.state.proposals.length).toBe(1);
+  }, 90000);
+
+  it("Reset also restores the diagram box positions", async () => {
+    await mount(); await tab("Diagram");
+    await screen.findByTestId("pattern-canvas", {}, T);
+    expect(await screen.findByText(/Moved: 0 box/, {}, T)).toBeInTheDocument();
+    await click("reset");
+    expect(await screen.findByText(/Moved: 0 box/, {}, T)).toBeInTheDocument();
+  });
+});
+
+describe("stale answers", () => {
+  it("a late scenario answer never overwrites the scenario picked after it (stale-response guard on the state)", async () => {
+    await mount();
+    delay = (u) => (u.includes("scenario=discover") ? 600 : 0);
+    await pick("scenarios", "discover"); await pick("scenarios", "gateway");
+    await new Promise((r) => setTimeout(r, 1000));
+    await waitFor(() => expect(screen.getByTestId("scenario-say")).toHaveTextContent(/typed confirmation/), T);
+  }, 60000);
+
+  it("a write answer for a mode the visitor has already left is not shown (stale write guard)", async () => {
+    await mount(); await live(); await tab("Safe sync");
+    await waitFor(() => expect(screen.getByTestId("run-sync")).toBeEnabled(), T);
+    delay = (u) => (u.includes("/api/sync") ? 700 : 0);
+    await click("run-sync"); await click("mode-mock");
+    await new Promise((r) => setTimeout(r, 1200));
+    await waitFor(() => expect(screen.getByTestId("banner")).toHaveTextContent(/MOCK mode/), T);
+    expect(screen.queryByTestId("last-action")).toBeNull();
+  }, 60000);
+});
+
+describe("hostile text is shown inert", () => {
+  it("control and bidi characters become visible escapes, markup stays text", () => {
+    expect(visible("a‮b\u0000c")).toBe("a\\u202eb\\u0000c");
+    expect(visible("<img src=x onerror=alert(1)>")).toBe("<img src=x onerror=alert(1)>");
+  });
+});

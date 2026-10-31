@@ -1,0 +1,144 @@
+{
+  "schema": "diagram-studio/1",
+  "id": "safe-sync",
+  "title": "Safe sync: gone versus did not answer",
+  "lede": "A sync is a set of parts, one per provider and scope. If every part answered, an agent not seen is gone. If any part failed, nothing is deleted and an agent not seen is unknown, never gone. Lab reading of a partly-cut-off deck line. Ping release claim, UNVERIFIED on our tenant. Simulated.",
+  "groups": {
+    "src": {
+      "label": "Providers",
+      "color": "grey"
+    },
+    "ping": {
+      "label": "Governance",
+      "color": "red"
+    },
+    "people": {
+      "label": "People",
+      "color": "blue"
+    },
+    "rec": {
+      "label": "Record",
+      "color": "dark"
+    }
+  },
+  "nodes": [
+    {
+      "id": "ctl",
+      "label": "Governance controller",
+      "group": "ping",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "prov",
+      "label": "Provider APIs ({{castBrand}} accounts)",
+      "group": "src",
+      "x": 500,
+      "y": 0
+    },
+    {
+      "id": "run",
+      "label": "Run result: complete or partial",
+      "group": "ping",
+      "x": 0,
+      "y": 350
+    },
+    {
+      "id": "gone",
+      "label": "Gone: provider answered, agent absent",
+      "group": "rec",
+      "x": 500,
+      "y": 250
+    },
+    {
+      "id": "unk",
+      "label": "Unknown: provider did not answer; nothing deleted",
+      "group": "rec",
+      "x": 500,
+      "y": 450
+    },
+    {
+      "id": "inv",
+      "label": "Inventory",
+      "group": "ping",
+      "x": 1000,
+      "y": 350
+    }
+  ],
+  "edges": [
+    {
+      "source": "ctl",
+      "target": "prov",
+      "label": "list agents, part by part"
+    },
+    {
+      "source": "prov",
+      "target": "ctl",
+      "label": "answers, or silence"
+    },
+    {
+      "source": "ctl",
+      "target": "run",
+      "label": "compare with the inventory"
+    },
+    {
+      "source": "run",
+      "target": "gone",
+      "label": "complete run: not seen means gone"
+    },
+    {
+      "source": "run",
+      "target": "unk",
+      "label": "partial run: not seen means unknown"
+    },
+    {
+      "source": "run",
+      "target": "inv",
+      "label": "status marks only; no deletes"
+    }
+  ],
+  "steps": [
+    {
+      "title": "Ask every part",
+      "what": "The controller asks each provider for each scope.",
+      "edges": [
+        0
+      ]
+    },
+    {
+      "title": "Answers or silence",
+      "what": "A part either answers with its agents or does not answer at all.",
+      "edges": [
+        1
+      ]
+    },
+    {
+      "title": "Compare",
+      "what": "The run is compared with what the inventory already holds.",
+      "edges": [
+        2
+      ]
+    },
+    {
+      "title": "Complete run",
+      "what": "Every part answered: an agent that was not seen is marked gone.",
+      "edges": [
+        3
+      ]
+    },
+    {
+      "title": "Partial run",
+      "what": "At least one part failed: nothing is deleted and every unseen agent is marked unknown.",
+      "edges": [
+        4
+      ]
+    },
+    {
+      "title": "Status only",
+      "what": "The inventory records the marks. A later complete run recovers or confirms them.",
+      "edges": [
+        5
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "demos": [
+    {
+      "id": "agent-governance-lab",
+      "name": "Agent Governance LAB",
+      "kind": "Demo",
+      "description": "AI Platform Agents: a cross-cloud inventory across thirteen sources, a permission review with a five-level score, custodians with administrator approval before any action runs, remediation, a safe sync that never mistakes silence for deletion, AgentCore gateway governance and private-network discovery: a simulation of the 2026-11-02 Ping release claims. Mock tables, or a Live local engine. Every product claim is UNVERIFIED on our tenant.",
+      "url": "http://localhost:7300",
+      "healthPath": "/api/health",
+      "composeFile": "agent-governance-LAB/docker-compose.yml",
+      "composeOverlays": [],
+      "notes": "Host-run: ./scripts/run.sh (port 7300). Docker: HOST_PORT=7300 docker compose up --build -d (published on 127.0.0.1 only). Mock and Live are both loopback-only with zero outbound calls; the lab holds no credential for any cloud.",
+      "catalogId": "D105"
+    }
+  ]
+}

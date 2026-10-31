@@ -1,0 +1,156 @@
+{
+  "schema": "diagram-studio/1",
+  "id": "private-network-discovery",
+  "title": "Private-network discovery: only ever dialling out",
+  "lede": "A workload connector and scanner reach agents inside your own network and cloud accounts (Bedrock, AgentCore, Lex). The connector polls outbound through your proxy; nothing dials in. The lab makes no network call. Ping release claim, UNVERIFIED on our tenant. Simulated.",
+  "groups": {
+    "src": {
+      "label": "Providers",
+      "color": "grey"
+    },
+    "ping": {
+      "label": "Governance",
+      "color": "red"
+    },
+    "people": {
+      "label": "People",
+      "color": "blue"
+    },
+    "rec": {
+      "label": "Record",
+      "color": "dark"
+    }
+  },
+  "nodes": [
+    {
+      "id": "agents",
+      "label": "Agents in your network (Bedrock, AgentCore, Lex)",
+      "group": "src",
+      "x": 0,
+      "y": 150
+    },
+    {
+      "id": "scn",
+      "label": "Workload Scanner (runs in your account)",
+      "group": "src",
+      "x": 400,
+      "y": 150
+    },
+    {
+      "id": "conn",
+      "label": "Workload Connector",
+      "group": "src",
+      "x": 800,
+      "y": 150
+    },
+    {
+      "id": "prox",
+      "label": "Your proxy",
+      "group": "src",
+      "x": 800,
+      "y": 450
+    },
+    {
+      "id": "ctl",
+      "label": "Governance controller",
+      "group": "ping",
+      "x": 400,
+      "y": 450
+    },
+    {
+      "id": "inv",
+      "label": "Inventory with scanner location",
+      "group": "ping",
+      "x": 0,
+      "y": 450
+    }
+  ],
+  "edges": [
+    {
+      "source": "conn",
+      "target": "prox",
+      "label": "poll, outbound; findings leave the same way"
+    },
+    {
+      "source": "prox",
+      "target": "ctl",
+      "label": "poll forwarded"
+    },
+    {
+      "source": "ctl",
+      "target": "prox",
+      "label": "scan work in the reply"
+    },
+    {
+      "source": "prox",
+      "target": "conn",
+      "label": "work reaches the connector"
+    },
+    {
+      "source": "conn",
+      "target": "scn",
+      "label": "hand over the work"
+    },
+    {
+      "source": "scn",
+      "target": "agents",
+      "label": "scan inside your network"
+    },
+    {
+      "source": "ctl",
+      "target": "inv",
+      "label": "each agent stored with its scanner location"
+    }
+  ],
+  "steps": [
+    {
+      "title": "Poll out",
+      "what": "The connector opens the connection itself, outbound, through your proxy. Findings travel back out the same way.",
+      "edges": [
+        0
+      ]
+    },
+    {
+      "title": "Forwarded",
+      "what": "The proxy passes the poll to the controller.",
+      "edges": [
+        1
+      ]
+    },
+    {
+      "title": "Work in the reply",
+      "what": "Scan work comes back in the reply to that poll, not as a new inbound connection.",
+      "edges": [
+        2
+      ]
+    },
+    {
+      "title": "Work arrives",
+      "what": "The connector receives the work.",
+      "edges": [
+        3
+      ]
+    },
+    {
+      "title": "Hand over",
+      "what": "The connector gives it to the scanner, which holds the cloud access.",
+      "edges": [
+        4
+      ]
+    },
+    {
+      "title": "Scan",
+      "what": "The scanner reads the agents inside your network.",
+      "edges": [
+        5
+      ]
+    },
+    {
+      "title": "Recorded",
+      "what": "Each agent is stored with the scanner location: an AWS account, Azure subscription or GCP project.",
+      "edges": [
+        6
+      ]
+    }
+  ]
+}

@@ -1,0 +1,420 @@
+{
+  "schema": "demo-content-pack/1",
+  "id": "agent-governance-lab",
+  "title": "Agent Governance LAB",
+  "version": "0.1.0",
+  "demo": {
+    "id": "agent-governance-lab",
+    "name": "Agent Governance LAB",
+    "catalog": "D105",
+    "baseUrl": "http://localhost:7300",
+    "doctor": "/api/health",
+    "tags": [
+      "ai-platform-agents",
+      "inventory",
+      "custodian",
+      "approval",
+      "remediation",
+      "safe-sync",
+      "agentcore",
+      "private-network",
+      "simulated"
+    ]
+  },
+  "glossary": [
+    {
+      "id": "platform-agents",
+      "term": "AI Platform Agents",
+      "definition": "Inventory, permission review and remediation for AI agents across thirteen sources (AWS Bedrock Agents, AgentCore, Lex, Bedrock Flows, Google Vertex AI Agent Engine, Agent Builder, Agent Registry, Dialogflow CX, Azure AI Foundry, Copilot Studio, Salesforce Agentforce, Databricks Mosaic AI, Snowflake Cortex AI). Retires the name Workload Agent Discovery & Control. Ping release claim, UNVERIFIED on our tenant.",
+      "aliases": [
+        "Workload Agent Discovery & Control"
+      ]
+    },
+    {
+      "id": "inventory",
+      "term": "Cross-cloud inventory",
+      "definition": "Every agent with its identity, model, configuration and owner, including A2A agent cards from the Google Agent Registry; a dashboard of recently discovered and action-required counts with platform filters and per-agent detail (tools, knowledge bases, guardrails, credentials, bindings, sub-agents). The record shape is lab-invented. Ping release claim, UNVERIFIED on our tenant.",
+      "aliases": [
+        "deep agent anatomy"
+      ]
+    },
+    {
+      "id": "org-onboarding",
+      "term": "AWS Organizations onboarding by organizational unit",
+      "definition": "Member accounts are enumerated and onboarded automatically, scoped by organizational unit. The lab's organization, units and fake account ids (000000000001 style) are invented. Ping release claim, UNVERIFIED on our tenant.",
+      "aliases": [
+        "organizational unit"
+      ]
+    },
+    {
+      "id": "finding-score",
+      "term": "Findings and the five-level score",
+      "definition": "The deck says a five-level score is built from 46 specific findings. Those 46 are Ping's and are not in the deck beyond a few categories; the lab ships 13 illustrative findings of its own and a lab-invented scoring rule. The deck also lists Risk Scoring as Planned (slide 21): the discrepancy is shown, not resolved. Ping release claim, UNVERIFIED on our tenant.",
+      "aliases": [
+        "risk score",
+        "risk scoring"
+      ]
+    },
+    {
+      "id": "custodian",
+      "term": "Custodian",
+      "definition": "A named human who is accountable for an agent. An orphaned agent has none and is flagged. Assignment at discovery from an owner hint is a lab reading (rule-based assignment is Roadmap, Q4 2026: no behaviour claimed). Ping release claim, UNVERIFIED on our tenant.",
+      "aliases": [
+        "owner"
+      ]
+    },
+    {
+      "id": "custodian-approval",
+      "term": "Approval before a custodian action runs",
+      "definition": "Operations are restricted to administrators and each agent's assigned custodian and are written to the audit log with the acting user; every custodian action needs a tenant administrator's approval before it executes. The lab models it as propose, approve or deny, execute: self-approval, approve-after-deny and stale approvals are refused (lab reading). Ping release claim, UNVERIFIED on our tenant.",
+      "aliases": [
+        "propose approve execute"
+      ]
+    },
+    {
+      "id": "remediation",
+      "term": "Remediation",
+      "definition": "Delete on twelve of thirteen sources (Databricks is in development) and quarantine on nine (the slide names seven; the other two are lab reading placeholders), plus targeted fixes: strip an over-privileged role, stop a privileged flow, disable a named credential, retag or reconfigure. Ping release claim, UNVERIFIED on our tenant.",
+      "aliases": [
+        "delete",
+        "quarantine"
+      ]
+    },
+    {
+      "id": "safe-sync",
+      "term": "Safe sync",
+      "definition": "Discovery distinguishes \"this agent is gone\" from \"the provider did not answer\". If any part of a sync fails, nothing is deleted and agents not seen are marked unknown, not gone: a lab reading of a partly-cut-off deck line. Ping release claim, UNVERIFIED on our tenant.",
+      "aliases": [
+        "gone versus unknown"
+      ]
+    },
+    {
+      "id": "gateway-governance",
+      "term": "Governing the AgentCore gateway itself",
+      "definition": "The gateway is an object of policy: enable or disable a tool target, switch the WAF failure mode, close a bypass route, pin an endpoint, end a session, flip log-only to enforcing. The nine modelAgentCoreAccountMetadata field names (GatewayDetailJSON and the rest) come from the console swagger, schema only; their inner shapes are lab-invented. Ping release claim, UNVERIFIED on our tenant.",
+      "aliases": [
+        "gateway scorecard"
+      ]
+    },
+    {
+      "id": "typed-confirmation",
+      "term": "Typed confirmation",
+      "definition": "The deck names a typed confirmation for flipping log-only to enforcing. The lab asks for the gateway name, and uses the same for fail-closed (a lab reading). Wrong text changes nothing. Ping release claim, UNVERIFIED on our tenant.",
+      "aliases": []
+    },
+    {
+      "id": "private-network",
+      "term": "Private-network discovery",
+      "definition": "A workload connector and scanner reach agents inside your own network and cloud accounts (Bedrock, AgentCore and Lex), polling outbound through your proxy. Swagger names (schema only): modelPrivateNetworkTenantConfig { Enabled } and modelPrivateNetworkConfig { Enabled, ScannerRunsIn }; Enabled is fixed once added. Ping release claim, UNVERIFIED on our tenant.",
+      "aliases": [
+        "workload connector",
+        "workload scanner"
+      ]
+    },
+    {
+      "id": "succession",
+      "term": "Succession",
+      "definition": "When a custodian leaves, agent transfer to a new custodian is triggered (slide 19). Described in the deck, availability not stated. The lab proposes one transfer per agent for an administrator to approve. Ping release claim, UNVERIFIED on our tenant.",
+      "aliases": []
+    },
+    {
+      "id": "certification",
+      "term": "Certification campaign",
+      "definition": "Periodic review and approval of agent access (slides 18 and 58). Described in the deck, availability not stated. The lab's clock-free state machine escalates items nobody reviewed. Ping release claim, UNVERIFIED on our tenant.",
+      "aliases": [
+        "access review"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "deck-slides",
+      "title": "Ping ID4AI Workforce H2 2026 deck, slides 18, 19, 21, 35, 45 and 58",
+      "url": "https://example.invalid/ping-id4ai-workforce-h2-2026-deck",
+      "kind": "deck",
+      "use": "The AI Platform Agents release claims and the governance availability table.",
+      "status": "read",
+      "checked": "2026-10-31"
+    },
+    {
+      "id": "console-swagger",
+      "title": "Privilege console swagger, 2026-10-31 (schema only)",
+      "url": "https://example.invalid/privilege-console-swagger",
+      "kind": "schema",
+      "use": "Field names for the AgentCore gateway metadata and the private-network configuration. It proves names exist, not behaviour.",
+      "status": "read",
+      "checked": "2026-10-31"
+    }
+  ],
+  "cards": [
+    {
+      "id": "try-first-scan",
+      "label": "Scenario 1: The first scan: one inventory across thirteen sources",
+      "description": "Twenty-three agents are discovered across AWS, Google, Azure and three SaaS platforms (three more sit behind a private network or in an organizational unit that is not onboarded yet). Some have no custodian, some are public and unauthenticated, some hold administrator grants.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#inventory"
+      },
+      "terms": [
+        "platform-agents",
+        "inventory"
+      ],
+      "story": "S01"
+    },
+    {
+      "id": "try-discover",
+      "label": "Scenario 2: A second scan finds new agents and a new account",
+      "description": "Between scans, agents are created in cloud consoles and a new AWS account appears in an onboarded organizational unit. The next sync discovers them. Onboarding the sandbox OU brings its account in at the following sync.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#inventory"
+      },
+      "terms": [
+        "inventory",
+        "org-onboarding",
+        "safe-sync"
+      ],
+      "story": "S02"
+    },
+    {
+      "id": "try-approval",
+      "label": "Scenario 3: A custodian proposes, an administrator approves, then it runs",
+      "description": "Every custodian action needs approval from a tenant administrator before it executes. Self-approval, a custodian approving, approving too early and an unsupported delete are all refused, and the audit log names the acting user each time.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#inventory"
+      },
+      "terms": [
+        "custodian-approval",
+        "custodian"
+      ],
+      "story": "S03"
+    },
+    {
+      "id": "try-remediate",
+      "label": "Scenario 4: Targeted fixes bring the score down",
+      "description": "Strip an unused write role, stop a privileged flow, disable a named credential, close a public endpoint. Each is proposed by the custodian, approved by an administrator and executed; the finding that fired stops firing.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#inventory"
+      },
+      "terms": [
+        "remediation",
+        "finding-score"
+      ],
+      "story": "S04"
+    },
+    {
+      "id": "try-partial-failure",
+      "label": "Scenario 5: A provider does not answer: nothing is deleted",
+      "description": "An agent is really deleted in a console while one provider is down. The partial run deletes nothing and marks every agent it could not see as unknown, never gone. A clean run afterwards marks the really removed agent as gone and recovers the rest.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#inventory"
+      },
+      "terms": [
+        "safe-sync"
+      ],
+      "story": "S05"
+    },
+    {
+      "id": "try-gateway",
+      "label": "Scenario 6: Governing the gateway itself",
+      "description": "Flip log-only to enforcing: a wrong typed confirmation changes nothing, the gateway name does. Close a bypass route and see who was reachable only through it. Disable a target, fail the WAF closed, pin the endpoint, end a session. The scorecard of twelve checks moves each time.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#inventory"
+      },
+      "terms": [
+        "gateway-governance",
+        "typed-confirmation"
+      ],
+      "story": "S06"
+    },
+    {
+      "id": "try-private-network",
+      "label": "Scenario 7: Agents inside your own network",
+      "description": "A tenant that has not enabled Private network cannot add a connection. Enable it, add a connection whose scanner runs in an AWS account, find that Enabled is fixed once added, let the connector poll outbound, and the next sync discovers the private agents, each carrying where the scanner runs.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#inventory"
+      },
+      "terms": [
+        "private-network",
+        "safe-sync"
+      ],
+      "story": "S07"
+    },
+    {
+      "id": "try-succession-certify",
+      "label": "Scenario 8: A custodian leaves; a certification campaign runs",
+      "description": "When a custodian leaves, a transfer is proposed for each agent and an administrator approves each. A campaign asks each custodian to certify or revoke; a revoke goes through approval; unreviewed items escalate to an administrator.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#inventory"
+      },
+      "terms": [
+        "succession",
+        "certification",
+        "custodian-approval"
+      ],
+      "story": "S08"
+    },
+    {
+      "id": "try-self-approval",
+      "label": "Approve your own proposal",
+      "description": "Propose as an administrator and try to approve it yourself: refused. A custodian cannot approve at all.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#ownership"
+      },
+      "terms": [
+        "custodian-approval"
+      ]
+    },
+    {
+      "id": "try-partial-sync",
+      "label": "Make a provider not answer",
+      "description": "Run a sync with one provider failing: nothing is deleted and unseen agents become unknown, not gone.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#sync"
+      },
+      "terms": [
+        "safe-sync"
+      ]
+    },
+    {
+      "id": "try-typed-confirmation",
+      "label": "Flip the gateway to enforcing",
+      "description": "A wrong typed confirmation changes nothing; the gateway name flips it.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#gateway"
+      },
+      "terms": [
+        "gateway-governance",
+        "typed-confirmation"
+      ]
+    },
+    {
+      "id": "concept-why-platform-agents",
+      "label": "Why it matters: AI Platform Agents (slide 45)",
+      "description": "Challenge: Agents created in cloud consoles sit outside identity processes: nobody inventoried them and nobody knows what they reach. Each over-privileged agent is a silent breach path that no current review covers. Technical: Cross-cloud inventory, permission review, 46-finding risk scores and one console to fix or delete. Business: Cuts agent-audit effort sharply and closes exfiltration paths before they are exploited. (Ping claims, unverified on our tenant. Per the deck, slide 45.)",
+      "group": "concept",
+      "action": {
+        "type": "route",
+        "href": "/#talk"
+      },
+      "terms": [
+        "platform-agents",
+        "inventory",
+        "safe-sync"
+      ]
+    },
+    {
+      "id": "concept-risk-discrepancy",
+      "label": "Risk Scoring: slide 45 versus slide 21",
+      "description": "Slide 45 describes a five-level risk score built from 46 findings as part of AI Platform Agents (ENHANCED, GA). Slide 21 lists \"Risk Scoring\" (outlier detection based on risky access and anomalous behaviour) as Planned. The deck does not say how the two relate: they may be different things (a finding-based score versus outlier detection), or the score may be only partly shipped. The lab does not resolve this: it shows a finding-based score, tags it, and claims nothing about outlier detection.",
+      "group": "concept",
+      "action": {
+        "type": "route",
+        "href": "/#review"
+      },
+      "terms": [
+        "finding-score"
+      ]
+    },
+    {
+      "id": "concept-availability",
+      "label": "What is GA, roadmap or planned (slide 21)",
+      "description": "Platform Agent Discovery, Activity Collectors and Agent Delegated Administration are GA; Shadow AI Discovery, Agent Lifecycle Management, Agent Classification, Custodian Management and Agent Events are Roadmap (Q4 2026); Access Visualization and Risk Scoring are Planned. The lab claims no behaviour for the roadmap items.",
+      "group": "concept",
+      "action": {
+        "type": "route",
+        "href": "/#inventory"
+      },
+      "terms": [
+        "custodian",
+        "finding-score"
+      ]
+    },
+    {
+      "id": "concept-diagram",
+      "label": "Diagrams",
+      "description": "Three diagrams: the governance cycle; safe sync; and private-network discovery.",
+      "group": "concept",
+      "action": {
+        "type": "route",
+        "href": "/#diagram"
+      },
+      "terms": [
+        "safe-sync",
+        "private-network"
+      ]
+    },
+    {
+      "id": "ref-doctor",
+      "label": "Doctor and health",
+      "description": "Preflight checks and the demo-health/1 endpoint.",
+      "group": "setup",
+      "action": {
+        "type": "route",
+        "href": "/api/health"
+      }
+    }
+  ],
+  "stories": [
+    {
+      "id": "S01",
+      "title": "The first scan: one inventory across thirteen sources",
+      "say": "Twenty-three agents are discovered across AWS, Google, Azure and three SaaS platforms (three more sit behind a private network or in an organizational unit that is not onboarded yet). Some have no custodian, some are public and unauthenticated, some hold administrator grants."
+    },
+    {
+      "id": "S02",
+      "title": "A second scan finds new agents and a new account",
+      "say": "Between scans, agents are created in cloud consoles and a new AWS account appears in an onboarded organizational unit. The next sync discovers them. Onboarding the sandbox OU brings its account in at the following sync."
+    },
+    {
+      "id": "S03",
+      "title": "A custodian proposes, an administrator approves, then it runs",
+      "say": "Every custodian action needs approval from a tenant administrator before it executes. Self-approval, a custodian approving, approving too early and an unsupported delete are all refused, and the audit log names the acting user each time."
+    },
+    {
+      "id": "S04",
+      "title": "Targeted fixes bring the score down",
+      "say": "Strip an unused write role, stop a privileged flow, disable a named credential, close a public endpoint. Each is proposed by the custodian, approved by an administrator and executed; the finding that fired stops firing."
+    },
+    {
+      "id": "S05",
+      "title": "A provider does not answer: nothing is deleted",
+      "say": "An agent is really deleted in a console while one provider is down. The partial run deletes nothing and marks every agent it could not see as unknown, never gone. A clean run afterwards marks the really removed agent as gone and recovers the rest."
+    },
+    {
+      "id": "S06",
+      "title": "Governing the gateway itself",
+      "say": "Flip log-only to enforcing: a wrong typed confirmation changes nothing, the gateway name does. Close a bypass route and see who was reachable only through it. Disable a target, fail the WAF closed, pin the endpoint, end a session. The scorecard of twelve checks moves each time."
+    },
+    {
+      "id": "S07",
+      "title": "Agents inside your own network",
+      "say": "A tenant that has not enabled Private network cannot add a connection. Enable it, add a connection whose scanner runs in an AWS account, find that Enabled is fixed once added, let the connector poll outbound, and the next sync discovers the private agents, each carrying where the scanner runs."
+    },
+    {
+      "id": "S08",
+      "title": "A custodian leaves; a certification campaign runs",
+      "say": "When a custodian leaves, a transfer is proposed for each agent and an administrator approves each. A campaign asks each custodian to certify or revoke; a revoke goes through approval; unreviewed items escalate to an administrator."
+    }
+  ]
+}
