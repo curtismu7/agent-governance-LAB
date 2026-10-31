@@ -25,8 +25,8 @@ export function AvailTag({ value }) {
 }
 
 // status words with a state, so meaning never rests on colour alone
-const GOOD = new Set(["active", "complete", "certified", "executed", "approved", "ok", "green", "onboarded"]);
-const BAD = new Set(["gone", "deleted", "denied", "stale", "failed", "revoked", "red", "unknown-risk"]);
+const GOOD = new Set(["active", "complete", "certified", "executed", "approved", "ok", "green", "onboarded", "enabled", "closed", "outbound"]);
+const BAD = new Set(["gone", "deleted", "denied", "stale", "failed", "revoked", "red", "disabled", "open"]);
 export const StatusTag = ({ status }) => <span className="tag" data-state={GOOD.has(status) ? "ok" : BAD.has(status) ? "bad" : "warn"} data-testid="status">{status}</span>;
 export const LevelTag = ({ level, name }) => <span className="tag" data-state={level >= 4 ? "bad" : level === 3 ? "warn" : "ok"} data-testid="level">{`L${level} ${name}`}</span>;
 
