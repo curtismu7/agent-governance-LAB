@@ -35,3 +35,16 @@ test('the store expires idle workspaces after the ttl, and REFUSES a new one at 
   assert.equal(w.size(), 0);
   w.engine('d', 'finance', C); assert.equal(w.size(), 1, 'room again once the idle ones expired');
 });
+
+test('the DEFAULTS are the stated ones: 500 workspaces (the 501st is refused) and one hour idle (3,600,000 ms stays, one ms more expires)', () => {
+  let t = 1_000_000;
+  const w = createWorkspaces({ now: () => t });
+  for (let i = 0; i < 500; i++) w.engine(`w-${i}`, 'finance', C);
+  assert.equal(w.size(), 500);
+  assert.throws(() => w.engine('w-500', 'finance', C), (e) => e.code === 'too_many_workspaces' && e.status === 429 && /an idle one expires after an hour/.test(e.message));
+  t += 3_600_000;
+  assert.ok(w.peek('w-0', 'finance'), 'idle for exactly one hour is still kept');
+  t += 1;
+  assert.equal(w.peek('w-0', 'finance'), null, 'idle for one hour and a millisecond has expired');
+  assert.equal(w.size(), 0);
+});

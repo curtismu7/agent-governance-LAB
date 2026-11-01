@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DETECTORS, MAX_FREE, cleanFree, findCredentials, maskText } from '../src/credentials.js';
+import { DETECTORS, MAX_FREE, PERCENT_ROUNDS, cleanFree, findCredentials, maskText } from '../src/credentials.js';
 import { maskDeep } from '../src/mask.js';
 import { createWorkspaces } from '../src/workspaces.js';
 import { C, K, A, newEngine, withServer, get, json, W } from './helpers.js';
@@ -124,4 +124,45 @@ test('a credential typed into a proposal reason, a comment or a retag value is m
   }
   assert.ok(n > 30);
   assert.match(e.snapshot().proposals.at(-1).reason, /\[masked:/);
+});
+
+// ---- second review F1: percent-encoded values, "api key" with a space, a dash as the separator ----
+const PCT = ['pctSpace', 'pctTwice', 'pctThrice', 'pctMixed', 'apiKeySpace', 'pwdDash'];
+
+test('F1: percent-encoded values (1, 2 and 3 rounds), "api key: x" with a space and "pwd - x" are masked by cleanFree and by the response mask', () => {
+  for (const n of PCT) {
+    const out = cleanFree(`please ${SECRETS[n]} thanks`);
+    assert.ok(!out.includes(NEEDLE[n]), `${n}: "${NEEDLE[n]}" survived in "${out}"`); assert.match(out, /\[masked:/, n);
+    assert.ok(!JSON.stringify(maskDeep({ x: `a ${SECRETS[n]} b` })).includes(NEEDLE[n]), `${n}: the response mask covers it too`);
+  }
+  // the three layers, spelled out
+  assert.match(cleanFree('my%20pass' + 'word%20is%20Kiwi-Fruit-91'), /\[masked:password-is\]/);
+  assert.match(cleanFree('pass' + 'word%253DTr0ub4dorXyz'), /\[masked:assignment\]/);
+  assert.match(cleanFree('pass' + 'word%25253DTr0ub4dorXyz'), /\[masked:assignment\]/);
+  assert.match(cleanFree('api key: Rr88ttYYuu'), /\[masked:assignment\]/);
+  assert.match(cleanFree('pwd - Kk99Jj88Hh'), /\[masked:password-dash\]/);
+  assert.match(cleanFree('API  KEY = Rr88ttYYuu'), /\[masked:assignment\]/);
+});
+
+test('F1: a malformed percent escape never throws, and a half-decoded or lone % is left as text', () => {
+  for (const bad of ['%', '%%', '%zz', '%E0%A4%A', '%C0%AF', '%ED%A0%80', '100%', 'a%2', '%ff%fe%fd', `${'%41'.repeat(5000)}`, `${'%25'.repeat(2000)}41`]) assert.doesNotThrow(() => cleanFree(bad), bad.slice(0, 20));
+  assert.equal(cleanFree('100% sure, 50%25 done'), '100% sure, 50%25 done', 'a plain percent sign and a valid escape are not credentials, and the text is kept as typed');
+  assert.doesNotThrow(() => maskDeep({ a: '%E0%A4%A', b: ['%zz', '%'] }));
+  // an invalid UTF-8 run next to a credential: the credential is still found
+  const out = cleanFree('%E0%A4%A then pass' + 'word%20is%20Kiwi-Fruit-91'); assert.ok(!out.includes('Kiwi-Fruit-91'));
+});
+
+test('F1: ordinary text with percent escapes or a dash is not masked (no false positives)', () => {
+  for (const t of ['the handbook says 100%25 of reviews need two approvers', 'see 50%2B coverage', 'password - see the handbook', 'pw - none', 'a%20b%20c plain words', 'rate limit 100%25']) assert.ok(!/\[masked:/.test(cleanFree(t)), t);
+});
+
+test('F1 (stated limit): a password with no keyword before it, such as "login with hunter2hunter2 please", is not recognisable and is not masked', () => {
+  assert.equal(cleanFree('login with hunter2hunter2 please'), 'login with hunter2hunter2 please');
+});
+
+test('F1: the decoding is bounded to three rounds and keeps mask-before-truncate', () => {
+  assert.equal(PERCENT_ROUNDS, 3);
+  const pad = 'x '.repeat(190);
+  const out = cleanFree(`${pad}my%20pass` + 'word%20is%20Kiwi-Fruit-91', 400);
+  assert.ok(!out.includes('Kiwi') && out.length <= 400);
 });

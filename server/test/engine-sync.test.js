@@ -12,7 +12,7 @@ test('the first scan discovers 23 agents across all thirteen sources; private-ne
   assert.equal(new Set(s.agents.map((a) => a.source)).size, 13);
   assert.equal(s.summary.bySource.length, 13);
   for (const id of ['ag-agentcore-02', 'ag-lex-02', 'ag-bedrockflow-02']) assert.equal(agentOf(e, id), undefined, id);
-  assert.equal(s.sync.runs.length, 1); assert.equal(s.sync.last.outcome, 'complete');
+  assert.equal(s.sync.runs.length, 1); assert.equal(s.sync.last.outcome, 'not-fully-scanned', 'the private account has no enabled connection: part of the estate was not scanned');
 });
 
 test('the second scan finds three new agents and enumerates the new AWS account in an onboarded OU', () => {
@@ -70,12 +70,12 @@ test('PARTIAL FAILURE: nothing is deleted, and every agent not seen is unknown, 
   assert.ok(r.parts.filter((p) => p.status === 'failed').every((p) => p.source === 'vertexai'));
 });
 
-test('COMPLETE run after a partial one: the really removed agent is gone, the silent ones are recovered', () => {
+test('a clean run after a partial one: the really removed agent is gone, the silent ones are recovered (the private account is still not scanned)', () => {
   const e = newEngine(); e.sync({});
   e.providerChange({ agentId: 'ag-lex-01', present: false });
   e.sync({ failures: [{ source: 'vertexai', kind: 'error' }] });
   const r = e.sync({});
-  assert.equal(r.outcome, 'complete');
+  assert.equal(r.outcome, 'not-fully-scanned');
   assert.deepEqual(r.gone, ['ag-lex-01']);
   assert.deepEqual([...r.recovered].sort(), ['ag-vertexai-01', 'ag-vertexai-02', 'ag-vertexai-03']);
   assert.equal(statusOf(e, 'ag-lex-01'), 'gone');
@@ -146,4 +146,55 @@ test('discoverAll finds all 29 agents; the catalog has 13 sources and every scop
   const e = newEngine(); discoverAll(e);
   assert.equal(e.snapshot().agents.length, 29);
   assert.equal(SOURCES.length, 13); assert.equal(new Set(SCOPES.map((s) => s.id)).size, SCOPES.length);
+});
+
+// ---- the outcome label (second review F2): "complete" only when every part answered and nothing was left unknown ----
+const partsWith = (r, status) => r.parts.filter((p) => p.status === status).map((p) => `${p.source}/${p.scope}`).sort();
+
+test('OUTCOME: complete when every part answered and no agent is unknown; the private network connected and both OUs onboarded', () => {
+  const e = newEngine(); const r = discoverAll(e);
+  assert.equal(r.outcome, 'complete');
+  assert.deepEqual([partsWith(r, 'failed'), partsWith(r, 'not-scanned'), r.unknown], [[], [], []]);
+});
+
+test('OUTCOME: a fresh workspace is not complete, and the reason is the private account (the reviewer\'s second repro)', () => {
+  const e = newEngine(); const r = e.sync({});
+  assert.equal(r.outcome, 'not-fully-scanned');
+  assert.deepEqual(partsWith(r, 'not-scanned'), ['agentcore/000000000002', 'lex/000000000002']);
+  assert.deepEqual(partsWith(r, 'failed'), []);
+});
+
+test('OUTCOME: narrowing the onboarded OUs leaves agents unknown and the run is NOT complete (the reviewer\'s first repro)', () => {
+  const e = newEngine(); e.sync({}); e.sync({});
+  e.setOnboarding({ actor: A, ous: ['ou-lab-sandbox'] });
+  const r = e.sync({});
+  assert.equal(r.unknown.length, 6, 'the agents in the production OU are unknown, not gone');
+  assert.deepEqual(r.gone, []);
+  assert.equal(r.outcome, 'not-fully-scanned');
+  assert.equal(e.snapshot().audit.filter((x) => x.kind === 'sync').at(-1).outcome, 'not-fully-scanned', 'the audit entry carries the same label');
+});
+
+test('OUTCOME: a connection that is later turned off leaves the private agents unknown and the run is NOT complete', () => {
+  const e = newEngine(); discoverAll(e);
+  e.setPrivateTenant({ actor: A, enabled: false });
+  const r = e.sync({});
+  assert.deepEqual([...r.unknown].sort(), ['ag-agentcore-02', 'ag-lex-02']);
+  assert.equal(r.outcome, 'not-fully-scanned');
+});
+
+test('OUTCOME: a failure still makes it partial (and deletes nothing) even when other parts were also not scanned', () => {
+  const e = newEngine(); e.sync({});
+  e.providerChange({ agentId: 'ag-lex-01', present: false });
+  const r = e.sync({ failures: [{ source: 'vertexai', kind: 'error' }] });
+  assert.equal(r.outcome, 'partial');
+  assert.ok(partsWith(r, 'not-scanned').length > 0 && partsWith(r, 'failed').length > 0);
+  assert.deepEqual(r.gone, []);
+});
+
+test('OUTCOME: not-scanned parts do not stop an agent that really disappeared in a part that answered from being marked gone', () => {
+  const e = newEngine(); e.sync({});
+  e.providerChange({ agentId: 'ag-bedrock-01', present: false });
+  const r = e.sync({});
+  assert.equal(r.outcome, 'not-fully-scanned');
+  assert.deepEqual(r.gone, ['ag-bedrock-01']);
 });

@@ -33,6 +33,13 @@ export const SECRETS = {
   zeroWidth: ['sk-liv', '​', 'e-Qw3rTy9Uio1Pas7Dfg'].join(''),
   bom: ['ghp_Zk3Qw9Lm', '﻿', '2Xv8Rt5Yp1Nb7Hc4Jd6Fa0Sg'].join(''),
   wordJoiner: ['AKIAZXCV', '⁠', 'BNMASDFGHJKL'].join(''),
+  // percent-encoded (1, 2 and 3 rounds), "api key" with a space, a dash as the separator (found by the second review)
+  pctSpace: ['my%20pass', 'word%20is%20Kiwi-Fruit-91'].join(''),
+  pctTwice: ['pass', 'word%253DTr0ub4dorXyz'].join(''),
+  pctThrice: ['pass', 'word%25253DZx8Ww7Vv6Uu'].join(''),
+  pctMixed: ['api%20key', '%3A%20Mm44ppQQrr'].join(''),
+  apiKeySpace: ['api k', 'ey: Rr88ttYYuu'].join(''),
+  pwdDash: ['p', 'wd - Kk99Jj88Hh'].join(''),
   // personal-looking data
   ssn: ['123-', '45-', '6789'].join(''),
   email: ['jane.doe', '@gmail.com'].join(''),
@@ -47,6 +54,7 @@ export const NEEDLE = {
   pem: 'MIIEvQIBADANBgkqhkiG9w0BAQEFAASC', bearer: 'tokenvalue', assignment: 'hunter2hunter2', blob: 'QUJDREVGR0hJSktM', hex: 'deadbeefdeadbeef', hex40: '3f786850e387550f', hex32: '5d41402abc4b2a76',
   plainIs: 'Tr0ub4dor', passcode: 'zebra-Quartz', pwEq: 'Hunter2Hunter2', pin: '482915', passphrase: 'correct horse', userinfo: 'Sup3rS3cretPw', authToken: 'abc123SECRETvalue', authBasic: ['dXNlcjpw', 'YXNzd29yZA'].join(''), google: ['a0AfH6SM', 'BxQ1w2e3'].join(''),
   accountKey: ['abcdEFGH', '1234'].join(''), sessionId: ['00D5g00000', '8dkQz'].join(''), key31: ['Zq9Xk2Lm', '8Rt4Vb7N'].join(''), shortGh: 'shortone1234', skShort: 'ab12cd34', secretIs: 'Zx9Kq2Lm5Vb',
+  pctSpace: 'Kiwi-Fruit-91', pctTwice: 'Tr0ub4dorXyz', pctThrice: 'Zx8Ww7Vv6Uu', pctMixed: 'Mm44ppQQrr', apiKeySpace: 'Rr88ttYYuu', pwdDash: 'Kk99Jj88Hh',
   zeroWidth: 'Qw3rTy9Uio1Pas7Dfg', bom: 'Nb7Hc4Jd6Fa0Sg', wordJoiner: 'BNMASDFGHJKL', ssn: '123-45-6789', email: 'jane.doe', card: '4111 1111 1111', cardDashes: '4111-1111-1111', phone: '555 0134', phoneUs: '555-0134',
 };
 // What must NOT be masked: ordinary prose, ids, dates, resource and policy names.
@@ -59,5 +67,6 @@ export const PLAIN = [
   'role-lab-admin-ops and sa-vertex-01.proj-lab-001 hold roles/aiplatform.user',
   'passing the review needs sign-off from priya.nair and lee.park, see non-human-identity-governance-track',
   'see https://gw1.fabrikam.example and https://github.example/payments-api/pull/123 and the incident write-up',
+  'the handbook says 100%25 of reviews need two approvers, see 50%2B coverage and password - see the handbook',
   'order 4111 1111 1111 1112 is not a card number (it fails the check digit)',
 ];

@@ -21,6 +21,14 @@ test('the lab ships thirteen illustrative findings of its own, and the deck\'s n
   assert.equal(LEVELS.length, 5);
 });
 
+test('LF-10 boundary with literal numbers: 90 days is not stale, 91 is (the constant is 90)', () => {
+  const cred = (d, enabled = true) => mk({ credentials: [{ id: 'c', name: 'k', rotatedDaysAgo: d, enabled }] });
+  assert.equal(STALE_CREDENTIAL_DAYS, 90);
+  assert.ok(!ids(cred(89)).includes('LF-10')); assert.ok(!ids(cred(90)).includes('LF-10'), '90 days ago is not MORE than 90');
+  assert.ok(ids(cred(91)).includes('LF-10'), '91 days ago is stale');
+  assert.match(FINDINGS.find((f) => f.id === 'LF-10').says, /more than 90 days/);
+});
+
 test('a clean agent has no finding and the minimal level', () => {
   const a = assess(mk(), ctx());
   assert.deepEqual([a.findings, a.score, a.level, a.levelName], [[], 0, 1, 'Minimal']);

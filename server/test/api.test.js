@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { A, A2, C, K, K2, api, get, json, post, put, rawHttp, withServer, W } from './helpers.js';
 import { installNetguard } from '../src/netguard.js';
 import { mockState } from '../src/service.js';
@@ -200,7 +203,8 @@ test('the Host check, same-origin writes, body size, JSON errors and 404 behave;
     const bad = await rawHttp(`${url}/api/sync`, { method: 'POST', headers: { host: new URL(url).host, 'content-type': 'application/json', origin: url }, body: '{"mode":' });
     assert.equal(bad.status, 400); assert.doesNotMatch(bad.text, /node_modules|\bat \S+ \(file:/);
     const nf = await get(url, '/api/nope'); assert.equal(nf.status, 404); assert.deepEqual(await nf.json(), { error: 'not_found' });
-    assert.equal((await get(url, '/api/proposals/prop-0001/decision')).status, 404);
+    const wrong = await get(url, '/api/proposals/prop-0001/decision');
+    assert.equal(wrong.status, 405, 'a known route with the wrong method is 405, not 404'); assert.equal(wrong.headers.get('allow'), 'POST'); assert.deepEqual(await wrong.json(), { error: 'method_not_allowed' });
     assert.equal((await get(url, '/api/health')).headers.get('x-content-type-options'), 'nosniff');
   });
 });
@@ -228,4 +232,26 @@ test('zero outbound network attempts across the whole API in both modes', async 
     await api(url, 'POST', '/api/custodians/depart', { depart: { actor: A, person: K2, successor: C.castCustodian3 } });
   });
   assert.deepEqual(guard.attempts, []);
+});
+
+test('F5: a known route with the wrong method answers 405 with an Allow header; an unknown route is still the fixed 404', async () => {
+  await withServer(async (url) => {
+    for (const [method, path, allow] of [['GET', '/api/sync', 'POST'], ['PUT', '/api/sync', 'POST'], ['DELETE', '/api/state', 'GET'], ['POST', '/api/state', 'GET'], ['POST', '/api/story', 'GET'], ['GET', '/api/reset', 'POST'], ['POST', '/api/org/onboarding', 'PUT'], ['GET', '/api/org/onboarding', 'PUT'], ['PUT', '/api/proposals', 'POST'], ['GET', '/api/private-network/connections', 'POST'], ['POST', '/api/private-network/connections/conn-001', 'PUT'], ['GET', '/api/gateways/gw-lab-01/actions', 'POST']]) {
+      const r = await fetch(`${url}${path}`, { method, headers: { origin: url, 'content-type': 'application/json' }, body: method === 'GET' ? undefined : '{}' });
+      assert.equal(r.status, 405, `${method} ${path}`); assert.equal(r.headers.get('allow'), allow, `${method} ${path}`); assert.deepEqual(await r.json(), { error: 'method_not_allowed' });
+    }
+    const ok = await post(url, '/api/sync', { mode: 'live' }); assert.equal(ok.status, 200, 'the right method still works');
+    const none = await get(url, '/api/nothing-here'); assert.equal(none.status, 404); assert.deepEqual(await none.json(), { error: 'not_found' });
+  });
+});
+
+test('F5: the page is served for routes only; a missing file (/assets/nope.js, /favicon.ico) is a fixed JSON 404, not the HTML page', async () => {
+  const dist = fs.mkdtempSync(path.join(os.tmpdir(), 'agl-dist-')); fs.writeFileSync(path.join(dist, 'index.html'), '<!doctype html><title>page</title>'); fs.mkdirSync(path.join(dist, 'assets')); fs.writeFileSync(path.join(dist, 'assets', 'real.js'), 'export {}');
+  try {
+    await withServer(async (url) => {
+      for (const p of ['/', '/inventory', '/some/deep/route', '/#sync']) { const r = await get(url, p); assert.equal(r.status, 200, p); assert.match(r.headers.get('content-type'), /text\/html/); assert.match(await r.text(), /<title>page<\/title>/); }
+      for (const p of ['/assets/nope.js', '/favicon.ico', '/robots.txt', '/a/b/c.css', '/assets/real.js.map']) { const r = await get(url, p); assert.equal(r.status, 404, p); assert.match(r.headers.get('content-type'), /json/); assert.deepEqual(await r.json(), { error: 'not_found' }, p); }
+      const real = await get(url, '/assets/real.js'); assert.equal(real.status, 200); assert.equal(await real.text(), 'export {}');
+    }, { webDist: dist });
+  } finally { fs.rmSync(dist, { recursive: true, force: true }); }
 });

@@ -77,7 +77,7 @@ test('the cap on workspaces REFUSES a new one (429) and evicts nothing: a flood 
   await withServer(async (url) => {
     for (const id of ['one', 'two', 'three']) assert.equal((await post(url, '/api/sync', { mode: 'live', vertical: 'finance' }, { 'x-workspace': id })).status, 200);
     const r = await post(url, '/api/sync', { mode: 'live', vertical: 'finance' }, { 'x-workspace': 'four' });
-    assert.equal(r.status, 429); assert.equal((await r.json()).error, 'too_many_workspaces');
+    assert.equal(r.status, 429); const j = await r.json(); assert.deepEqual(Object.keys(j).sort(), ['detail', 'error']); assert.equal(j.error, 'too_many_workspaces'); assert.match(j.detail, /too many workspaces are active; an idle one expires after an hour/); assert.ok(!j.detail.includes('four'), 'the refused id is not echoed');
     assert.equal(workspaces.size(), 3); assert.ok(workspaces.peek('one', 'finance'), 'the oldest workspace is still there');
     assert.equal((await post(url, '/api/sync', { mode: 'live', vertical: 'finance' }, { 'x-workspace': 'one' })).status, 200, 'an existing workspace keeps working');
     assert.equal(A.length > 0, true);

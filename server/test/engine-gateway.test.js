@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { A, A2, C, K, codeOf, newEngine } from './helpers.js';
-import { CHECKS, TRUNCATE_AT, scorecard, seedGateways, bypassOpen } from '../src/gateway.js';
+import { CHECKS, TRUNCATE_AT, scorecard, seedGateways, bypassOpen, metadata } from '../src/gateway.js';
 
 const G1 = 'gw-lab-01'; const NAME1 = `${C.castDomain1}-gateway`;
 const gw = (e, id = G1) => e.snapshot().gateways.find((g) => g.id === id);
@@ -159,4 +159,32 @@ test('every gateway change is audited with the actor, the gateway and the scorec
   const a = e.snapshot().audit.at(-1);
   assert.deepEqual([a.kind, a.actor, a.gateway, a.scorecardAfter - a.scorecardBefore], ['gateway:pin-endpoint', A2, G1, 1]);
   assert.match(e.hops[0].request.url, /\.example\//); assert.match(e.hops[0].label, /never sent/);
+});
+
+test('F6: a gateway action reports the scorecard total it computed, the same number the snapshot shows (not a constant)', () => {
+  const e = newEngine();
+  const r = act(e, { kind: 'set-waf', mode: 'fail-closed', confirm: NAME1 });
+  assert.equal(r.scorecard.total, 12);
+  assert.equal(r.scorecard.total, gw(e).scorecard.total);
+  assert.equal(r.scorecard.total, gw(e).scorecard.checks.length);
+  assert.equal(r.scorecard.after, gw(e).scorecard.greenCount);
+});
+
+test('bypassOpen: a runtime is open when its resource policy is not gateway-only OR a caller can reach it directly (each alone is enough)', () => {
+  const rt = (resourcePolicy, direct) => ({ resourcePolicy, callers: [{ principal: 'p', viaGateway: true, direct }] });
+  assert.equal(bypassOpen(rt('gateway-only', false)), false);
+  assert.equal(bypassOpen(rt('direct-allowed', false)), true, 'the policy alone');
+  assert.equal(bypassOpen(rt('gateway-only', true)), true, 'a direct caller alone');
+  assert.equal(bypassOpen(rt('direct-allowed', true)), true);
+});
+
+test('Truncated: the wire limit is 24,000 characters of JSON; exactly 24,000 is not truncated, 24,001 is', () => {
+  const size = (nameLen) => { const g = seedGateways(C); g[0].name = 'n'.repeat(nameLen); return JSON.stringify((({ Truncated, ...rest }) => rest)(metadata(g, []))).length; };
+  const base = size(1);
+  // the metadata blob is built from a gateway list; pad one gateway's name so the JSON (without the flag) is exactly 24,000 / 24,001 characters
+  const pad = (target) => { const g = seedGateways(C); g[0].name = 'n'.repeat(1 + target - base); return g; };
+  const at = metadata(pad(24_000), []); const over = metadata(pad(24_001), []);
+  assert.equal(TRUNCATE_AT, 24_000);
+  assert.equal(JSON.stringify((({ Truncated, ...rest }) => rest)(at)).length, 24_000); assert.equal(at.Truncated, false);
+  assert.equal(JSON.stringify((({ Truncated, ...rest }) => rest)(over)).length, 24_001); assert.equal(over.Truncated, true);
 });

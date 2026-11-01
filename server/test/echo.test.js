@@ -97,3 +97,26 @@ test('field names are not echoed either: an unknown key that is itself a credent
     }
   });
 });
+
+// Second review F1: the reviewer's exact repro. A percent-encoded (1, 2, 3 rounds), "api key"-with-a-space or "pwd - x" value in the reason, and in the
+// actor / agentId / kind slots, must be absent from the answer, the hop pane (hops[0].request.body) and the state read afterwards.
+test('F1 repro: percent-encoded and spaced shapes in reason, actor, agentId and kind never appear in the answer, the hops or a later GET /api/state', async () => {
+  const names = ['pctSpace', 'pctTwice', 'pctThrice', 'pctMixed', 'apiKeySpace', 'pwdDash'];
+  await withServer(async (url) => {
+    for (const n of names) {
+      const { raw, probe } = NEEDLES[n]; const W = { 'x-workspace': `rv-${n.toLowerCase()}`.slice(0, 30) };
+      const r = await post(url, '/api/proposals', live({ proposal: { actor: 'maya.chen', agentId: 'ag-bedrock-01', kind: 'quarantine', reason: raw } }), W);
+      const body = await r.json(); assert.equal(r.status, 200, n);
+      assert.ok(!JSON.stringify(body).includes(probe), `${n}: absent from the answer`);
+      assert.ok(!JSON.stringify(body.state.proposals.at(-1).reason).includes(probe), `${n}: absent from state.proposals[-1].reason`);
+      assert.match(body.state.proposals.at(-1).reason, /\[masked:/, n);
+      assert.ok(!JSON.stringify(body.hops[0].request.body).includes(probe), `${n}: absent from hops[0].request.body.reason`);
+      assert.ok(!(await (await get(url, '/api/state?mode=live', W)).text()).includes(probe), `${n}: absent from a later GET /api/state`);
+      for (const [path, send, slot] of [['/api/sync', post, (v) => ({ sync: { actor: v } })], ['/api/proposals', post, (v) => ({ proposal: { actor: K, agentId: v, kind: 'quarantine' } })], ['/api/proposals', post, (v) => ({ proposal: { actor: K, agentId: 'ag-bedrock-01', kind: v } })], ['/api/org/onboarding', put, (v) => ({ onboarding: { actor: v, ous: [] } })]]) {
+        const s = await send(url, path, live(slot(raw)), W); const t = await s.text();
+        assert.ok(s.status >= 400, `${n} ${path}: refused`); assert.ok(!t.includes(probe), `${n} ${path}: absent from the refusal and its hop pane`);
+      }
+      assert.ok(!(await (await get(url, '/api/state?mode=live', W)).text()).includes(probe), `${n}: absent from the state afterwards`);
+    }
+  });
+});

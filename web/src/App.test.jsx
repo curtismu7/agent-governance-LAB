@@ -303,9 +303,43 @@ describe("Safe sync", () => {
     await click("fail-vertexai"); await click("run-sync");
     await waitFor(() => expect(screen.getByTestId("run-result")).toHaveTextContent(/run-0004/), T);
     expect(screen.getByTestId("run-counts")).toHaveTextContent(/marked gone: 1/); expect(screen.getByTestId("run-counts")).toHaveTextContent(/recovered: 4|recovered: 3/);
-    expect(screen.getByTestId("run-result")).toHaveAttribute("data-state", "ok");
+    expect(screen.getByTestId("run-result")).toHaveAttribute("data-state", "warn"); // the private account is still not scanned: never a green "complete"
+    expect(within(screen.getByTestId("run-result")).getAllByTestId("status")[0]).toHaveTextContent("not-fully-scanned");
+    expect(screen.getByTestId("not-scanned-note")).toHaveTextContent(/Not fully scanned: 2 part\(s\) were not scanned/);
     expect(wholePageText()).toMatch(/lab reading of a partly-cut-off deck line/);
   }, 120000);
+
+  it("a run is shown green and 'complete' only when every part answered: the first scan, with the private account unscanned, is not", async () => {
+    await mount(); await live(); await tab("Safe sync");
+    await waitFor(() => expect(screen.getByTestId("run-sync")).toBeEnabled(), T);
+    await click("run-sync"); await waitFor(() => expect(screen.getByTestId("run-result")).toHaveTextContent(/run-0002/), T);
+    const result = screen.getByTestId("run-result");
+    expect(result).toHaveAttribute("data-state", "warn");
+    expect(within(result).getAllByTestId("status")[0]).toHaveTextContent("not-fully-scanned"); expect(within(result).getAllByTestId("status")[0]).toHaveAttribute("data-state", "warn");
+    expect(within(screen.getByTestId("runs")).queryAllByText("complete")).toHaveLength(0);
+    expect(within(screen.getByTestId("parts")).getAllByText("not-scanned").length).toBe(2);
+  }, 120000);
+});
+
+describe("the workspace id", () => {
+  it("is generated with at least one letter, however the random bytes fall (an all-digit id that passes the card check is refused by the server)", async () => {
+    const { newWorkspaceId } = await import("./workspace");
+    const real = window.crypto.getRandomValues.bind(window.crypto); let calls = 0;
+    window.crypto.getRandomValues = (a) => { calls += 1; if (calls <= 3) { a.set([0x41, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11]); return a; } return real(a); };
+    try { const id = newWorkspaceId(); expect(id).toMatch(/^w-[0-9a-f]{16}$/); expect(id).toMatch(/[a-f]/); expect(calls).toBeGreaterThan(3); }
+    finally { window.crypto.getRandomValues = real; }
+    for (let i = 0; i < 200; i++) expect(newWorkspaceId()).toMatch(/[a-f]/);
+  });
+
+  it("a stored id the server refuses (400 bad_workspace) is replaced and the request retried once, so the page still loads", async () => {
+    window.sessionStorage.setItem("agl.workspace", "w-4111111111111111");
+    await mount();
+    expect(screen.queryByText(/Could not load the lab/)).toBeNull();
+    const stateCalls = seen.filter((s) => s.url.includes("/api/state"));
+    expect(stateCalls.length).toBeGreaterThanOrEqual(2); // the refused one and the retry
+    const stored = window.sessionStorage.getItem("agl.workspace");
+    expect(stored).not.toBe("w-4111111111111111"); expect(stored).toMatch(/^w-[0-9a-f]{16}$/);
+  }, 60000);
 });
 
 describe("AgentCore gateway", () => {

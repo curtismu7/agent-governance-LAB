@@ -2,15 +2,21 @@
 // forgot to clean its input. Iterative: a deep structure cannot overflow the stack. The generic long-blob detector is NOT applied here
 // (ids, hashes and trace ids are long and legitimate); the specific token, key, bearer and assignment detectors are. Visitor text is
 // already fully cleaned (long blobs included) on the way in by cleanFree.
-import { DETECTORS, maskSpans } from './credentials.js';
+import { DETECTORS, maskSpans, percentRounds } from './credentials.js';
 
 const SPECIFIC = DETECTORS.filter((d) => !d.generic);
 const OPAQUE = new Set(['hash', 'prevHash', 'traceparent', 'traceId', 'chainHead']);
 
-export function maskResponseText(text) {
+const spansOf = (text) => {
   const spans = [];
   for (const d of SPECIFIC) { d.re.lastIndex = 0; for (const m of text.matchAll(d.re)) if (!d.accept || d.accept(m[0])) spans.push({ start: m.index, end: m.index + m[0].length, id: d.id }); }
-  return spans.length ? maskSpans(text, spans) : text;
+  return spans;
+};
+// Percent-encoded text is matched in its decoded forms too (up to three rounds); the deepest form holding a credential is what is kept, masked.
+export function maskResponseText(text) {
+  const rounds = percentRounds(text);
+  for (let i = rounds.length - 1; i >= 0; i--) { const spans = spansOf(rounds[i]); if (spans.length) return maskSpans(rounds[i], spans); }
+  return text;
 }
 
 export function maskDeep(value) {

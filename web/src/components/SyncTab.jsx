@@ -21,7 +21,7 @@ export default function SyncTab({ story, lab, actor }) {
       {ro && <p className="muted" data-testid="read-only-note">Mock only reads tables: switch to Live to run a sync.</p>}
       <section className="panel">
         <h2 className="panel__title">Safe sync <ClaimTag /> <SourceTag source="reading" label="lab reading of a partly-cut-off deck line" /></h2>
-        <p className="muted">A sync has one part per provider and scope. If every part answers, an agent that was not seen is marked <strong>gone</strong>. If any part fails, nothing is deleted and an agent that was not seen is marked <strong>unknown</strong>, never gone; a later complete run recovers or confirms it. The deck line about what a run does after a partial failure is cut off in the PDF, so this behaviour is the lab's reading, not the deck's words.</p>
+        <p className="muted">A sync has one part per provider and scope. A run is <strong>complete</strong> only when every part answered and no agent was left unknown; if some of the estate was not scanned (a private network with no enabled connection, or an organizational unit that is not onboarded) it is <strong>not-fully-scanned</strong>. If every part answers, an agent that was not seen is marked <strong>gone</strong>. If any part fails, nothing is deleted and an agent that was not seen is marked <strong>unknown</strong>, never gone; a later complete run recovers or confirms it. The deck line about what a run does after a partial failure is cut off in the PDF, so this behaviour is the lab's reading, not the deck's words.</p>
         <p className="muted">The lab's world moves on between the first and second scan: three new agents appear in cloud consoles and a new AWS account appears. The first scan has run; the next sync finds them.</p>
         <h3 className="panel__sub">Make a provider not answer (injected failure)</h3>
         <div className="chips" role="group" aria-label="Providers that will not answer">
@@ -47,6 +47,7 @@ export default function SyncTab({ story, lab, actor }) {
             <li>Accounts enumerated and onboarded: {last.enumerated.length ? last.enumerated.join(", ") : "none"}</li>
             <li>Removed from the provider by this run: {last.removedFromProvider}; inventory records removed: {last.inventoryRecordsRemoved} (both measured before and after the run)</li>
             {last.outcome === "partial" && <li data-testid="partial-note">Partial run: nothing was deleted, and every agent not seen is unknown, not gone.</li>}
+            {last.outcome === "not-fully-scanned" && <li data-testid="not-scanned-note">Not fully scanned: {last.parts.filter((p) => p.status === "not-scanned").length} part(s) were not scanned (a private network with no enabled connection) and {last.unknown.length} agent(s) are unknown because their part or organizational unit was not scanned. The parts that were scanned still mark what they no longer see as gone. This is not a complete run.</li>}
           </ul>
           {(last.gone.length > 0 || last.unknown.length > 0) && <p className="muted">Gone: {last.gone.map(visible).join(", ") || "none"}. Unknown: {last.unknown.map(visible).join(", ") || "none"}.</p>}
           <div className="scroll"><table className="tbl tbl--wide" data-testid="parts">

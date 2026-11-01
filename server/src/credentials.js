@@ -26,9 +26,11 @@ export const DETECTORS = [
   // "my password is Tr0ub4dor", "the passcode was zebra-Quartz-77": plain-language password statements
   D('password-is', /\b(?:password|passwd|passcode|passkey|pwd|pw)s?\s+(?:is|are|was)\s+\S{3,}/gi),
   // "the secret is x1y2z3", "api key is ...": only when the value has a digit, so "the secret is stored in the vault" is left alone
-  { id: 'secret-is', re: /\b(?:secret|token|api[ _-]?key|key|credential)s?\s+(?:is|are|was)\s+\S{4,}/gi, accept: (m) => /\d/.test(m.replace(/^\S+\s+\S+\s+/, '')) },
+  { id: 'secret-is', re: /\b(?:secret|token|api[ _-]{0,3}key|key|credential)s?\s+(?:is|are|was)\s+\S{4,}/gi, accept: (m) => /\d/.test(m.replace(/^\S+\s+\S+\s+/, '')) },
   D('pin', /\bpin(?:[ _-]?(?:code|number))?\s*(?:[:=]|\b(?:is|are|was)\b)\s*\d{3,8}\b/gi),
-  D('assignment', /\b(?:password|passwd|passcode|passkey|pwd|pw|pass|secret(?:[ _-]?key)?|token|api[_-]?key|apikey|client[_-]?secret|private[_-]?key|access[_-]?key|account[_-]?key|session[_-]?id|sessionid|credential)s?\s*[:=]\s*\S{3,}/gi),
+  D('assignment', /\b(?:password|passwd|passcode|passkey|pwd|pw|pass|secret(?:[ _-]?key)?|token|api[ _-]{0,3}key|apikey|client[ _-]{0,3}secret|private[ _-]{0,3}key|access[ _-]{0,3}key|account[ _-]{0,3}key|session[ _-]{0,3}id|sessionid|credential)s?\s*[:=]\s*\S{3,}/gi),
+  // "pwd - Kk99Jj88Hh": a dash as the separator; only when the value has a letter and a digit, so "password - see the handbook" is left alone
+  { id: 'password-dash', re: /\b(?:password|passwd|passcode|passkey|pwd|pw|pass)s?[ \t]+[-\u2013\u2014]+[ \t]+\S{3,}/gi, accept: (m) => { const v = m.replace(/^\S+[ \t]+\S+[ \t]+/, ''); return /\d/.test(v) && /[A-Za-z]/.test(v); } },
   // Personal-looking data: a US social security number, an email address, a payment card number (Luhn checked) and a phone number
   D('ssn', /\b\d{3}-\d{2}-\d{4}\b/g),
   D('email', /[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,5}/g),
@@ -63,11 +65,30 @@ export function maskText(input) {
   return text ? maskSpans(text, findCredentials(text)) : text;
 }
 
-// Free text from the visitor: zero-width and bidi characters DELETED (so a token cannot be hidden by interleaving them), other control characters
-// turned into spaces, credential-shaped runs masked, and only THEN cut to length (a token that straddles the cut is masked, not half shown).
+// Percent-decoding, bounded to PERCENT_ROUNDS rounds. A run of %XX escapes is decoded as UTF-8; a malformed run falls back to one byte per escape, so a bad
+// escape never throws. The text of every round is returned (round 0 is the input), so a credential hidden under 1, 2 or 3 layers of encoding is found.
+export const PERCENT_ROUNDS = 3;
+const decodeRun = (run) => { try { return decodeURIComponent(run); } catch { return run.replace(/%([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16))); } };
+export function percentRounds(text) {
+  const rounds = [text];
+  for (let i = 0; i < PERCENT_ROUNDS; i++) {
+    const cur = rounds[rounds.length - 1];
+    const next = cur.replace(/(?:%[0-9a-fA-F]{2})+/g, decodeRun);
+    if (next === cur) break;
+    rounds.push(next);
+  }
+  return rounds;
+}
+
+// Free text from the visitor: percent-encoding undone (up to three rounds) and the DECODED text matched too, zero-width and bidi characters DELETED (so a token
+// cannot be hidden by interleaving them), other control characters turned into spaces, credential-shaped runs masked, and only THEN cut to length (a token that
+// straddles the cut is masked, not half shown). When a decoded form holds a credential, the masked decoded form is what is kept.
+const flatten = (s) => s.normalize('NFKC') // fullwidth look-alikes become the ASCII they imitate
+  .replace(/[\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]/g, '')
+  .replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ');
 export function cleanFree(value, max = MAX_FREE) {
-  const flat = String(value ?? '').slice(0, MAX_SCAN).normalize('NFKC') // fullwidth look-alikes become the ASCII they imitate
-    .replace(/[\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]/g, '')
-    .replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ');
-  return maskText(flat).replace(/\s+/g, ' ').trim().slice(0, max);
+  const rounds = percentRounds(String(value ?? '').slice(0, MAX_SCAN)).map(flatten);
+  let pick = rounds[0];
+  for (let i = rounds.length - 1; i > 0; i--) if (findCredentials(rounds[i]).length) { pick = rounds[i]; break; }
+  return maskText(pick).replace(/\s+/g, ' ').trim().slice(0, max);
 }

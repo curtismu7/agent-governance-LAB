@@ -39,7 +39,11 @@ export function createApp({ health = createHealth(), configFile = CONFIG, worksp
   const noStore = (res) => res.set('Cache-Control', 'no-store');
   const ws = (req, res) => { const id = workspaceFrom(req); if (!id) res.status(400).json({ error: 'bad_workspace' }); return id; };
   const bodyOf = (req) => (isObj(req.body) ? req.body : {});
+  // Every route the API has, with its methods: a known route called with the wrong method answers 405 + Allow instead of a bare 404.
+  const methodsOf = new Map();
+  const known = (method, route) => methodsOf.set(route, [...(methodsOf.get(route) || []), method.toUpperCase()]);
 
+  for (const r of ['/story', '/diagram', '/info', '/state']) known('get', r);
   api.get('/story', (req, res) => { noStore(res); res.json(buildStory(castFor(req), verticalOf(req))); });
   api.get('/diagram', (req, res) => { noStore(res); res.json(buildDiagram(castFor(req), DIAGRAM_NAMES.includes(req.query.name) ? req.query.name : DIAGRAM_NAMES[0])); });
   api.get('/info', (_req, res) => { noStore(res); res.json({ mode: defaultMode(), modes: ['mock', 'live'], simulated: true, release: '2026-11-02', unverified: true }); });
@@ -55,6 +59,7 @@ export function createApp({ health = createHealth(), configFile = CONFIG, worksp
 
   // Every write: Live only, strict top-level keys, one trace, hops, and the whole fresh state back. Refusals keep their honest HTTP status.
   const write = (method, route, { op, keys, params }) => {
+    known(method, route);
     api[method](route, (req, res, next) => {
       const id = ws(req, res); if (!id) return;
       noStore(res);
@@ -93,12 +98,15 @@ export function createApp({ health = createHealth(), configFile = CONFIG, worksp
   write('post', '/gateways/:id/actions', { op: 'gateway', keys: ['action'], params: (req) => ({ gatewayId: idParam(req), action: obj(req.body.action) }) });
 
   // Reset clears this workspace's engines (requests, grants, receipts, platform state, outbox, audit, the clock) and nothing else.
+  known('post', '/reset');
   api.post('/reset', (req, res) => { const id = ws(req, res); if (!id) return; noStore(res); workspaces.reset(id); return res.json({ reset: 'ok', workspace: id }); });
+  for (const [route, methods] of methodsOf) api.all(route, (_req, res) => res.set('Allow', [...new Set(methods)].join(', ')).status(405).json({ error: 'method_not_allowed' }));
   api.use((_req, res) => res.status(404).json({ error: 'not_found' }));
   app.use('/api', api);
   if (fs.existsSync(path.join(webDist, 'index.html'))) {
     app.use(express.static(webDist));
-    app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile(path.join(webDist, 'index.html')));
+    // The page is served for routes (no file extension); a missing file (/assets/nope.js, /favicon.ico) is a fixed JSON 404, not the page.
+    app.get(/^\/(?!api\/).*/, (req, res, next) => (path.extname(req.path) ? next() : res.sendFile(path.join(webDist, 'index.html'))));
   }
   // The last two handlers catch everything that is left, for every method and every path: Express's default answers ("Cannot POST /<path>", or an
   // HTML stack trace with file paths) would echo the path the visitor typed, which may be a token. Fixed JSON, no path.
@@ -106,7 +114,7 @@ export function createApp({ health = createHealth(), configFile = CONFIG, worksp
   // eslint-disable-next-line no-unused-vars
   app.use((err, _req, res, _next) => {
     const status = Number(err?.status || err?.statusCode);
-    if (err instanceof InputError) return res.status(err.status).json({ error: err.code });
+    if (err instanceof InputError) return res.status(err.status).json({ error: err.code, detail: err.message }); // the message is fixed text, never the caller's input
     if (status === 413) return res.status(413).json({ error: 'payload_too_large' });
     if (status >= 400 && status < 500) return res.status(status).json({ error: 'bad_request' });
     return res.status(500).json({ error: 'internal_error' });

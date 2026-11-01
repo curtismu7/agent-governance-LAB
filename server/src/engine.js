@@ -165,7 +165,10 @@ export class Engine {
       if (!failedAny && part && part.status === 'ok') { if (a.status !== 'gone') { a.status = 'gone'; this.bump(a); } run.gone.push(a.id); }
       else { if (a.status !== 'unknown') { a.status = 'unknown'; this.bump(a); } run.unknown.push(a.id); }
     }
-    run.outcome = failedAny ? 'partial' : 'complete';
+    // The outcome is "complete" only when every part answered AND no agent was left unknown. "partial": a provider did not answer (nothing is deleted).
+    // "not-fully-scanned": nothing failed, but some of the estate was not scanned (a private network with no enabled connection, or an organizational unit
+    // that is not onboarded), so agents there are unknown; the parts that were scanned still mark what they no longer see as gone.
+    run.outcome = failedAny ? 'partial' : (run.parts.some((p) => p.status !== 'ok') || run.unknown.length > 0) ? 'not-fully-scanned' : 'complete';
     // Measured, not asserted: how many provider objects and inventory records this run removed.
     run.removedFromProvider = [...before.present].filter((id) => !s.world.present.has(id)).length;
     run.inventoryRecordsRemoved = [...before.records].filter((id) => !s.agents.has(id)).length;

@@ -142,5 +142,5 @@ export function gatewayAction(e, gatewayId, a) {
   const after = scorecard(g).greenCount;
   e.audit(`gateway:${a.kind}`, who, { gateway: g.id, ...result, scorecardBefore: before, scorecardAfter: after });
   e.hop(`lab controller to the AgentCore control API (illustration, never sent): ${a.kind}`, { method: 'POST', url: `https://control.agentcore.lab.example/gateways/${g.id}/${a.kind}`, body: { by: who } }, { status: 200, body: { ok: true } });
-  return { gateway: g.id, kind: a.kind, ...result, scorecard: { before, after, total: 12 } };
+  return { gateway: g.id, kind: a.kind, ...result, scorecard: { before, after, total: scorecard(g).total } };
 }

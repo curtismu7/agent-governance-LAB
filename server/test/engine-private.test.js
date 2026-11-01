@@ -95,7 +95,7 @@ test('switching the tenant setting off stops the scanning: the private agents be
   e.setPrivateTenant({ actor: A, enabled: false });
   const r = e.sync({});
   assert.deepEqual([r.gone, [...r.unknown].sort()], [[], ['ag-agentcore-02', 'ag-lex-02']]);
-  assert.equal(r.outcome, 'complete', 'not scanning is not a failure');
+  assert.equal(r.outcome, 'not-fully-scanned', 'not scanning is not a failure (nothing is deleted for it), but the run is not complete either');
 });
 
 test('the connector only ever dials out: every poll is outbound through the proxy, and the lab makes no network call', async () => {
