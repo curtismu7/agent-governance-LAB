@@ -130,7 +130,7 @@ export function gatewayAction(e, gatewayId, a) {
     result = { runtime: r.id, bypassDiff: { before: diffBefore, after: diffAfter }, lockedOut };
   } else if (a.kind === 'pin-endpoint') {
     const host = (() => { try { const u = new URL(String(a.endpoint)); return u.protocol === 'https:' && !u.username && !u.password && u.pathname === '/' && !u.search && !u.hash && !u.port ? u.hostname : null; } catch { return null; } })();
-    if (!isStr(a.endpoint, 120) || !host || !isReservedHost(host) || cleanFree(a.endpoint, 120) !== a.endpoint) throw refuse('bad_endpoint', 'endpoint must be an https URL on a .example or .invalid host, with no path, port or credentials');
+    if (!isStr(a.endpoint, 120) || !host || !isReservedHost(host) || cleanFree(a.endpoint) !== a.endpoint) throw refuse('bad_endpoint', 'endpoint must be an https URL on a .example or .invalid host, with no path, port or credentials');
     const clean = host.replace(/\.$/, '');
     if (g.pinnedEndpoint === `https://${clean}`) throw refuse('already_in_state', 'that endpoint is already pinned', 409);
     g.pinnedEndpoint = `https://${clean}`; result = { pinnedEndpoint: g.pinnedEndpoint };

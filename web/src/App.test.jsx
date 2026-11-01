@@ -254,11 +254,12 @@ describe("Ownership (Live): propose, approve, execute, and the refusals", () => 
     const others = [["my pass", "word is Tr0ub4dor-horse-stapl3"].join(""), ["https://svc-user:", "Sup3rS3cretPw@db.example/p"].join(""), ["123-", "45-", "6789"].join(""), ["jane.doe", "@gmail.com"].join(""), ["4111 1111 ", "1111 1111"].join("")];
     await tab("Ownership"); await screen.findByTestId("propose-panel", {}, T);
     await actAs(C.castCustodian); await pick("p-agent", "ag-bedrock-01"); await pick("p-kind", "retag");
-    setValue("p-tagvalue", `v ${secret}`); setValue("p-reason", `because ${secret} and ${others.join(" and ")}`);
+    // a tag value is at most 40 characters as typed: a longer one is refused whole, so the tag carries the first 30 characters of the token
+    setValue("p-tagvalue", `v ${secret.slice(0, 30)}`); setValue("p-reason", `because ${secret} and ${others.join(" and ")}`);
     await waitFor(() => expect(screen.getByTestId("propose")).toBeEnabled(), T);
     await click("propose");
     await waitFor(() => expect(screen.getByTestId("proposal-prop-0001")).toBeInTheDocument(), T);
-    const needles = [secret, "Tr0ub4dor", "Sup3rS3cretPw", "123-45-6789", "jane.doe", "4111 1111 1111"];
+    const needles = [secret, secret.slice(0, 30), "Tr0ub4dor", "Sup3rS3cretPw", "123-45-6789", "jane.doe", "4111 1111 1111"];
     for (const n of needles) expect(wholePageText()).not.toContain(n);
     expect(wholePageText()).toMatch(/\[masked:/);
     // the collapsed hops <pre> is in the DOM too: open it and check the markup text and the raw HTML

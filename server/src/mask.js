@@ -1,23 +1,13 @@
-// Defence in depth: every API response passes through maskDeep, so a credential-shaped value can never leave in any field even if a code path
-// forgot to clean its input. Iterative: a deep structure cannot overflow the stack. The generic long-blob detector is NOT applied here
-// (ids, hashes and trace ids are long and legitimate); the specific token, key, bearer and assignment detectors are. Visitor text is
-// already fully cleaned (long blobs included) on the way in by cleanFree.
-import { DETECTORS, maskSpans, percentRounds } from './credentials.js';
+// Defence in depth: every API response passes through maskDeep, so a credential-shaped value can never leave in any field, or in any object KEY, even if a code
+// path forgot to clean its input. Iterative: a deep structure cannot overflow the stack. The generic long-run detectors are NOT applied here (ids, hashes and trace
+// ids are long and legitimate); the specific token, key, bearer, userinfo, keyword and assignment detectors are, on the same normalised text (invisible characters
+// deleted, percent-decoding up to three rounds) as the intake. Visitor text is already fully cleaned (long runs included) on the way in by cleanFree.
+import { maskResponseText } from './credentials.js';
 
-const SPECIFIC = DETECTORS.filter((d) => !d.generic);
+export { maskResponseText };
 const OPAQUE = new Set(['hash', 'prevHash', 'traceparent', 'traceId', 'chainHead']);
-
-const spansOf = (text) => {
-  const spans = [];
-  for (const d of SPECIFIC) { d.re.lastIndex = 0; for (const m of text.matchAll(d.re)) if (!d.accept || d.accept(m[0])) spans.push({ start: m.index, end: m.index + m[0].length, id: d.id }); }
-  return spans;
-};
-// Percent-encoded text is matched in its decoded forms too (up to three rounds); the deepest form holding a credential is what is kept, masked.
-export function maskResponseText(text) {
-  const rounds = percentRounds(text);
-  for (let i = rounds.length - 1; i >= 0; i--) { const spans = spansOf(rounds[i]); if (spans.length) return maskSpans(rounds[i], spans); }
-  return text;
-}
+// defineProperty, not assignment: a key called __proto__ stays an own key of the copy instead of changing its prototype
+const put = (obj, key, value) => Object.defineProperty(obj, key, { value, enumerable: true, writable: true, configurable: true });
 
 export function maskDeep(value) {
   const clone = (x) => (Array.isArray(x) ? [] : x && typeof x === 'object' ? {} : x);
@@ -25,10 +15,17 @@ export function maskDeep(value) {
   const work = [[value, root, 'v', false]];
   while (work.length) {
     const [src, dst, key, opaque] = work.pop();
-    if (typeof src === 'string') { dst[key] = opaque ? src : maskResponseText(src); continue; }
-    if (src === null || typeof src !== 'object') { dst[key] = src; continue; }
-    const copy = clone(src); dst[key] = copy;
-    for (const k of Object.keys(src).reverse()) work.push([src[k], copy, k, OPAQUE.has(k)]);
+    if (typeof src === 'string') { put(dst, key, opaque ? src : maskResponseText(src)); continue; }
+    if (src === null || typeof src !== 'object') { put(dst, key, src); continue; }
+    const copy = clone(src); put(dst, key, copy);
+    const used = new Set();
+    for (const k of Object.keys(src).reverse()) {
+      // An object KEY can be text the visitor typed: masked like a value. Two keys that mask to the same text get a numeric suffix, nothing is dropped.
+      let nk = Array.isArray(src) ? k : maskResponseText(k);
+      for (let n = 2; used.has(nk); n++) nk = `${maskResponseText(k)}~${n}`;
+      used.add(nk);
+      work.push([src[k], copy, nk, OPAQUE.has(k)]);
+    }
   }
   return root.v;
 }

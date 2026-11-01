@@ -7,11 +7,29 @@ import { newTrace, formatTraceparent } from './trace.js';
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
-// A copy of the visitor's parameters that is safe to show: strings cleaned and masked, nothing else changed. Iterative and depth-limited.
+// A copy of the visitor's parameters that is safe to show in the request pane: every string and every object KEY cleaned and masked (nothing is cut), numbers and
+// booleans kept. Nothing is dropped silently: more than 10 list items or 20 keys, or nesting deeper than 3, is shown as a marker that says so. Two keys that mask
+// to the same text get a numeric suffix. Depth-limited, so a hostile structure cannot overflow the stack.
+export const SCRUB = { items: 10, keys: 20, depth: 3 };
 export function scrub(value, depth = 0) {
-  if (typeof value === 'string') return cleanFree(value, 300);
-  if (Array.isArray(value)) return depth > 3 ? [] : value.slice(0, 10).map((v) => scrub(v, depth + 1));
-  if (isObj(value)) return depth > 3 ? {} : Object.fromEntries(Object.keys(value).slice(0, 20).map((k) => [cleanFree(k, 40), scrub(value[k], depth + 1)]));
+  if (typeof value === 'string') return cleanFree(value);
+  if (Array.isArray(value)) {
+    if (depth > SCRUB.depth) return '[nested too deep to show]';
+    const shown = value.slice(0, SCRUB.items).map((v) => scrub(v, depth + 1));
+    return value.length > SCRUB.items ? [...shown, `[${value.length - SCRUB.items} more not shown]`] : shown;
+  }
+  if (isObj(value)) {
+    if (depth > SCRUB.depth) return '[nested too deep to show]';
+    const keys = Object.keys(value); const out = {}; const used = new Set();
+    for (const k of keys.slice(0, SCRUB.keys)) {
+      const clean = cleanFree(k); let nk = clean;
+      for (let n = 2; used.has(nk); n++) nk = `${clean}~${n}`;
+      used.add(nk);
+      Object.defineProperty(out, nk, { value: scrub(value[k], depth + 1), enumerable: true, writable: true, configurable: true });
+    }
+    if (keys.length > SCRUB.keys) Object.defineProperty(out, '[more keys]', { value: `${keys.length - SCRUB.keys} more not shown`, enumerable: true, writable: true, configurable: true });
+    return out;
+  }
   return typeof value === 'number' || typeof value === 'boolean' || value === null ? value : undefined;
 }
 

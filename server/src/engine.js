@@ -13,7 +13,7 @@ import { refuse } from './errors.js';
 
 export const AUDIT_MARGIN = 40; // new work is refused once fewer than this many audit slots are free: one action never writes more than this many entries
 export const SUCCESSION = 'succession (lab)'; // the proposer of a transfer that a custodian's departure triggers
-export const LIMITS = { proposals: 200, openPerAgent: 5, audit: 500, refusals: 200, runs: 30, connections: 10, polls: 50, failures: 20, reason: 300, comment: 200, tags: 6, hops: 40, campaigns: 5, name: 60, sources: 3, scopeIds: 5 };
+export const LIMITS = { proposals: 200, openPerAgent: 5, audit: 500, refusals: 200, runs: 30, connections: 10, polls: 50, failures: 20, reason: 300, comment: 200, value: 40, tags: 6, hops: 40, campaigns: 5, name: 60, sources: 3, scopeIds: 5 };
 export const PROPOSAL_KINDS = ['delete', 'quarantine', 'strip-role', 'stop-flow', 'disable-credential', 'retag', 'reconfigure', 'transfer', 'revoke-access'];
 export const FAILURE_KINDS = ['timeout', 'error', 'throttled'];
 export const SCANNER_KINDS = ['aws-account', 'azure-subscription', 'gcp-project'];
@@ -28,6 +28,13 @@ const clone = (x) => JSON.parse(JSON.stringify(x));
 const onlyKeys = (o, allowed) => isObj(o) && Object.keys(o).every((k) => allowed.includes(k));
 const strictKeys = (o, allowed, what = 'the call') => { if (!onlyKeys(o, allowed)) throw refuse('unknown_field', `${what} carries a field the lab does not take`); };
 const need = (cond, code, msg, status = 400) => { if (!cond) throw refuse(code, msg, status); };
+// Free text the visitor types (a reason, a comment, a tag value, a connection name): it must be text, and at most `max` characters AS TYPED, counted before any
+// masking; one character more is refused whole (400, fixed message with the number, never the text). What is kept is the masked text, never a cut one.
+const free = (value, max, what) => {
+  need(typeof value === 'string', `bad_${what}`, `${what} must be text`);
+  need(value.length <= max, `${what}_too_long`, `${what} is at most ${max} characters; nothing was changed`);
+  return cleanFree(value);
+};
 
 export class Engine {
   constructor(cast) {
@@ -212,7 +219,8 @@ export class Engine {
   }
 
   // ---------- proposals: propose -> admin approves or denies -> execute ---------------------------------------------------------------------------
-  validateKind(a, kind, params) {
+  // `stored`: the params were validated and cleaned when the proposal was made (the execute-time re-check), so the tag value is not cleaned or length-checked twice.
+  validateKind(a, kind, params, stored = false) {
     const src = SOURCE[a.source];
     const keys = { delete: [], quarantine: [], 'strip-role': ['permissionId'], 'stop-flow': ['flowId'], 'disable-credential': ['credentialId'], retag: ['key', 'value'], reconfigure: ['field', 'value'], transfer: ['to'], 'revoke-access': [] }[kind];
     strictKeys(params, keys, 'the proposal');
@@ -224,7 +232,7 @@ export class Engine {
     if (kind === 'retag') {
       need(typeof params.key === 'string' && TAG_KEYS.includes(params.key), 'bad_tag_key', `key must be one of ${TAG_KEYS.join(', ')}`);
       need(typeof params.value === 'string', 'bad_value', 'value must be text');
-      const value = cleanFree(params.value, 40); need(value.length > 0, 'bad_value', 'value must not be empty');
+      const value = stored ? params.value : free(params.value, LIMITS.value, 'value'); need(value.length > 0, 'bad_value', 'value must not be empty');
       need(a.tags[params.key] !== value, 'already_in_state', 'the tag already has that value', 409);
       need(Object.hasOwn(a.tags, params.key) || Object.keys(a.tags).length < LIMITS.tags, 'tag_limit', `an agent carries at most ${LIMITS.tags} tags`, 409);
       return { key: params.key, value };
@@ -268,7 +276,7 @@ export class Engine {
     // Operations are restricted to administrators and each agent's assigned custodian (slide 45).
     if (who.role !== 'admin' && who.id !== a.custodian) { this.audit('refused:not_allowed', who.id, { agentId: a.id, proposalKind: input.kind }); throw refuse('not_allowed', 'only an administrator or this agent\'s assigned custodian can propose an action on it', 403); }
     const params = this.validateKind(a, input.kind, input.params === undefined ? {} : input.params);
-    const reason = input.reason === undefined ? '' : (need(typeof input.reason === 'string', 'bad_reason', 'reason must be text'), cleanFree(input.reason, LIMITS.reason));
+    const reason = input.reason === undefined ? '' : free(input.reason, LIMITS.reason, 'reason');
     const p = this.makeProposal(who.id, a, input.kind, params, reason);
     // Only administrators act immediately (slide 45): an administrator's own action runs now, audited with the acting user. A custodian's waits for an administrator.
     if (who.role === 'admin') {
@@ -295,7 +303,7 @@ export class Engine {
     if (who.id === p.proposedBy) { this.audit('refused:self_approval', who.id, { proposal: p.id }); throw refuse('self_approval', 'nobody approves their own proposal', 403); }
     if (who.role !== 'admin') { this.audit('refused:admin_only', who.id, { proposal: p.id }); throw refuse('admin_only', 'every custodian action needs approval from a tenant administrator', 403); }
     need(input.decision === 'approve' || input.decision === 'deny', 'bad_decision', 'decision must be approve or deny');
-    const comment = input.comment === undefined ? '' : (need(typeof input.comment === 'string', 'bad_comment', 'comment must be text'), cleanFree(input.comment, LIMITS.comment));
+    const comment = input.comment === undefined ? '' : free(input.comment, LIMITS.comment, 'comment');
     need(p.status !== 'denied', 'already_denied', 'that proposal was denied; propose it again', 409);
     need(p.status !== 'stale', 'stale_proposal', 'that proposal went stale', 409);
     need(p.status === 'proposed', 'already_decided', 'that proposal is already decided', 409);
@@ -327,7 +335,7 @@ export class Engine {
     const a = this.s.agents.get(p.agentId);
     if (!a || !this.live(a) || a.rev !== p.agentRev) { this.markStale(p, 'the agent changed after the approval'); throw refuse('stale_proposal', 'the agent changed after the approval; propose it again', 409); }
     let params;
-    try { params = this.validateKind(a, p.kind, p.params); } catch (err) { this.markStale(p, 'the precondition no longer holds'); throw refuse('stale_proposal', 'the precondition no longer holds; propose it again', 409); }
+    try { params = this.validateKind(a, p.kind, p.params, true); } catch (err) { this.markStale(p, 'the precondition no longer holds'); throw refuse('stale_proposal', 'the precondition no longer holds; propose it again', 409); }
     const result = this.apply(a, p.kind, params);
     this.bump(a);
     p.status = 'executed'; p.executedBy = whoId; p.result = result;
@@ -410,7 +418,7 @@ export class Engine {
     if (isStr(input.itemId)) for (const c of this.s.campaigns) { const i = c.items.find((x) => x.id === input.itemId); if (i) { item = i; camp = c; } }
     need(item, 'unknown_item', 'no such certification item', 404);
     need(input.decision === 'certify' || input.decision === 'revoke', 'bad_decision', 'decision must be certify or revoke');
-    const comment = input.comment === undefined ? '' : (need(typeof input.comment === 'string', 'bad_comment', 'comment must be text'), cleanFree(input.comment, LIMITS.comment));
+    const comment = input.comment === undefined ? '' : free(input.comment, LIMITS.comment, 'comment');
     need(item.status === 'pending' || item.status === 'escalated', 'item_not_open', 'that item is already decided', 409);
     if (item.status === 'pending') {
       need(camp.status === 'open', 'campaign_closed', 'the custodians\' window is closed', 409);
@@ -451,7 +459,7 @@ export class Engine {
     const fields = creating ? ['name', 'sources', 'scopeIds', 'enabled', 'scannerId', 'scannerRunsIn'] : ['name', 'sources', 'scopeIds', 'enabled', 'scannerRunsIn'];
     strictKeys(c, fields, 'the connection');
     const out = {};
-    if (creating || c.name !== undefined) { need(typeof c.name === 'string', 'bad_name', 'name must be text'); out.name = cleanFree(c.name, LIMITS.name); need(out.name.length > 0, 'bad_name', 'name must not be empty'); }
+    if (creating || c.name !== undefined) { out.name = free(c.name, LIMITS.name, 'name'); need(out.name.length > 0, 'bad_name', 'name must not be empty'); }
     if (creating || c.sources !== undefined) {
       need(Array.isArray(c.sources) && c.sources.length >= 1 && c.sources.length <= LIMITS.sources && new Set(c.sources).size === c.sources.length && c.sources.every((x) => typeof x === 'string' && PRIVATE_NETWORK_SOURCES.includes(x)), 'bad_sources', 'sources must be a list of bedrock, agentcore or lex');
       out.sources = [...c.sources];
