@@ -4,7 +4,7 @@
       "id": "agent-governance-lab",
       "name": "Agent Governance LAB",
       "kind": "Demo",
-      "description": "AI Platform Agents: a cross-cloud inventory across thirteen sources, a permission review with a five-level score, custodians with administrator approval before any action runs, remediation, a safe sync that never mistakes silence for deletion, AgentCore gateway governance and private-network discovery: a simulation of the 2026-11-02 Ping release claims. Mock tables, or a Live local engine. Every product claim is UNVERIFIED on our tenant.",
+      "description": "AI Platform Agents: cross-cloud inventory of 13 sources, a five-level permission review, custodian approval before any action, remediation, a safe sync that never mistakes silence for deletion, AgentCore gateway governance and private-network discovery. Mock or Live. All product claims UNVERIFIED.",
       "url": "http://localhost:7300",
       "healthPath": "/api/health",
       "composeFile": "agent-governance-LAB/docker-compose.yml",
