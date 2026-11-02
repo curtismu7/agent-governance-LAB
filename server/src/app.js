@@ -104,9 +104,18 @@ export function createApp({ health = createHealth(), configFile = CONFIG, worksp
   api.use((_req, res) => res.status(404).json({ error: 'not_found' }));
   app.use('/api', api);
   if (fs.existsSync(path.join(webDist, 'index.html'))) {
-    app.use(express.static(webDist));
-    // The page is served for routes (no file extension); a missing file (/assets/nope.js, /favicon.ico) is a fixed JSON 404, not the page.
-    app.get(/^\/(?!api\/).*/, (req, res, next) => (path.extname(req.path) ? next() : res.sendFile(path.join(webDist, 'index.html'))));
+    // Files are served only when they exist (a dotfile such as /.env is never served); a miss falls through to the fixed JSON 404 below.
+    app.use(express.static(webDist, { dotfiles: 'ignore', index: false, redirect: false }));
+    // The page is the answer for ROUTES only: a path whose segments carry no dot at all (so no file extension and no dotfile). /api and everything under it never gets here: the API router above answers it. A missing file
+    // (/assets/nope.js, /favicon.ico, /robots.txt, /foo.map, /.env) is a fixed JSON 404, never the page. The page's own routes take GET and HEAD only: any other method
+    // on "/" answers 405 with Allow, like a known API route.
+    const isPageRoute = (p) => !p.includes('.');
+    app.all(/^\/.*/, (req, res, next) => {
+      if (!isPageRoute(req.path)) return next();
+      if (req.method === 'GET' || req.method === 'HEAD') return res.sendFile(path.join(webDist, 'index.html'));
+      if (req.path === '/') return res.set('Allow', 'GET, HEAD').status(405).json({ error: 'method_not_allowed' });
+      return next();
+    });
   }
   // The last two handlers catch everything that is left, for every method and every path: Express's default answers ("Cannot POST /<path>", or an
   // HTML stack trace with file paths) would echo the path the visitor typed, which may be a token. Fixed JSON, no path.

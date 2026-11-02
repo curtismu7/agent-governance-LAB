@@ -2,17 +2,28 @@
 // (requests, grants, receipts, the platforms' own state, the audit trail, the outbox and the lab clock). Bounded in count (new workspaces are refused at the cap, nothing is evicted) and age (idle for an hour).
 // The browser sends its id in X-Workspace (default "default"). Reset clears the current workspace only.
 import { Engine } from './engine.js';
-import { findCredentials } from './credentials.js';
+import { looksLikeCredential } from './credentials.js';
 import { refuse } from './errors.js';
 
 export const WORKSPACE_RE = /^[a-z0-9-]{1,40}$/;
 export const DEFAULT_WORKSPACE = 'default';
 
+// An id is lowercase letters, digits and hyphens, 1 to 40. It is echoed in the `workspace` field and in the hop headers, so it must not become a place to park a
+// secret: an id is refused (400 bad_workspace, never echoed) when it holds 24 or more hex characters in a row (a hash or key), when a hyphen-separated part names a
+// credential or starts a token (sk-..., pw-..., ghp-..., token-..., password-...), when it starts like a JWT, or when the credential detectors find something in it.
+// The page makes a new id and asks again (web/src/workspace.js applies the same rule to a saved id; a test compares the two on a table of ids).
+const CREDENTIAL_PARTS = new Set(['sk', 'pk', 'rk', 'pw', 'pwd', 'pass', 'passwd', 'password', 'passphrase', 'secret', 'token', 'apikey', 'bearer', 'glpat', 'ghp', 'gho', 'ghu', 'ghs', 'xoxa', 'xoxb', 'xoxp', 'xoxr', 'xoxs', 'akia', 'asia']);
+export function validWorkspaceId(raw) {
+  if (typeof raw !== 'string' || !WORKSPACE_RE.test(raw)) return false;
+  if (/[0-9a-f]{24,}/.test(raw) || raw.startsWith('eyj')) return false;
+  if (raw.split('-').some((part) => CREDENTIAL_PARTS.has(part))) return false;
+  return !looksLikeCredential(raw);
+}
+
 export function workspaceFrom(req) {
   const raw = req.headers['x-workspace'];
   if (raw === undefined) return DEFAULT_WORKSPACE;
-  // An id that looks like a credential (a 40-hex token, a long mixed run) is refused rather than echoed back in the `workspace` field and the hop headers.
-  return typeof raw === 'string' && WORKSPACE_RE.test(raw) && findCredentials(raw).length === 0 ? raw : null;
+  return validWorkspaceId(raw) ? raw : null;
 }
 
 export function createWorkspaces({ max = 500, ttlMs = 60 * 60 * 1000, now = Date.now } = {}) {

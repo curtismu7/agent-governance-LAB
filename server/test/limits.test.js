@@ -6,7 +6,7 @@ import { perform } from '../src/actions.js';
 import { A, K, K2, codeOf, discoverAll, newEngine, prop } from './helpers.js';
 
 test('every limit is the number the README and the Learning Hub text state', () => {
-  assert.deepEqual(LIMITS, { proposals: 200, openPerAgent: 5, audit: 500, refusals: 200, runs: 30, connections: 10, polls: 50, failures: 20, reason: 300, comment: 200, tags: 6, hops: 40, campaigns: 5, name: 60, sources: 3, scopeIds: 5 });
+  assert.deepEqual(LIMITS, { proposals: 200, openPerAgent: 5, audit: 500, refusals: 200, runs: 30, connections: 10, polls: 50, failures: 20, reason: 300, comment: 200, value: 40, tags: 6, hops: 40, campaigns: 5, name: 60, sources: 3, scopeIds: 5 });
   assert.equal(AUDIT_MARGIN, 40);
 });
 
@@ -35,18 +35,34 @@ test('HOPS 40: a trace keeps the first 40 hops and flags the rest as truncated',
   assert.deepEqual(e.hops.map((h) => h.n), Array.from({ length: 40 }, (_, i) => i + 1));
 });
 
-test('REASON 300: a proposal reason is cut to exactly 300 characters, and a comment to exactly 200', () => {
+test('REASON 300 / COMMENT 200 / VALUE 40 / NAME 60: the number typed is accepted, one more is refused whole (nothing is cut, nothing changes)', () => {
+  const chars = (n) => 'plain words '.repeat(40).slice(0, n - 1) + 'z'; // exactly n characters of ordinary text, never masked
   const e = newEngine();
-  const p = prop(e, K, 'ag-bedrock-02', 'quarantine', {}, { reason: 'plain words '.repeat(60) });
-  assert.equal(e.snapshot().proposals.find((x) => x.id === p.proposalId).reason.length, 300);
-  e.decide({ actor: A, proposalId: p.proposalId, decision: 'approve', comment: 'plain words '.repeat(60) });
-  assert.equal(e.snapshot().proposals.find((x) => x.id === p.proposalId).comment.length, 200);
+  const ok = prop(e, K, 'ag-bedrock-02', 'quarantine', {}, { reason: chars(300) });
+  assert.equal(e.snapshot().proposals.find((x) => x.id === ok.proposalId).reason.length, 300, 'all 300 typed characters kept: not cut');
+  const before = JSON.stringify(e.snapshot());
+  assert.equal(codeOf(() => prop(e, K, 'ag-bedrock-01', 'quarantine', {}, { reason: chars(301) })), 'reason_too_long');
+  assert.equal(JSON.stringify(e.snapshot()), before, 'a refused proposal changes nothing, not even the audit log');
+  assert.equal(e.snapshot().proposals.length, 1, 'the refused proposal was not created');
+  e.decide({ actor: A, proposalId: ok.proposalId, decision: 'approve', comment: chars(200) });
+  assert.equal(e.snapshot().proposals[0].comment.length, 200);
+  const p2 = prop(e, K, 'ag-bedrock-01', 'quarantine');
+  assert.equal(codeOf(() => e.decide({ actor: A, proposalId: p2.proposalId, decision: 'approve', comment: chars(201) })), 'comment_too_long');
+  assert.equal(e.snapshot().proposals.find((x) => x.id === p2.proposalId).status, 'proposed', 'a refused decision changes nothing');
+  const v40 = chars(40);
+  assert.equal(v40.length, 40);
+  const r = prop(e, K, 'ag-bedrock-02', 'retag', { key: 'environment', value: v40 });
+  assert.equal(e.snapshot().proposals.find((x) => x.id === r.proposalId).params.value.length, 40);
+  assert.equal(codeOf(() => prop(e, K, 'ag-bedrock-02', 'retag', { key: 'data-class', value: `${v40}z` })), 'value_too_long');
 });
 
-test('NAME 60: a connection name is cut to exactly 60 characters', () => {
+test('NAME 60: a connection name of 60 characters is kept whole, 61 is refused', () => {
+  const conn = (name) => ({ actor: A, connection: { name, sources: ['lex'], scopeIds: ['000000000002'], enabled: true, scannerId: 's1', scannerRunsIn: { kind: 'aws-account', id: '000000000009' } } });
   const e = newEngine(); e.setPrivateTenant({ actor: A, enabled: true });
-  e.addConnection({ actor: A, connection: { name: 'plain words '.repeat(20), sources: ['lex'], scopeIds: ['000000000002'], enabled: true, scannerId: 's1', scannerRunsIn: { kind: 'aws-account', id: '000000000009' } } });
+  e.addConnection(conn('plain words '.repeat(6).slice(0, 59) + 'z'));
   assert.equal(e.snapshot().privateNetwork.connections[0].name.length, 60);
+  assert.equal(codeOf(() => e.addConnection(conn('plain words '.repeat(6).slice(0, 60) + 'z'))), 'name_too_long');
+  assert.equal(e.snapshot().privateNetwork.connections.length, 1);
 });
 
 test('CONNECTIONS 10 / SOURCES 3 / SCOPES 5 / POLLS 50 / FAILURES 20 / RUNS 30 / CAMPAIGNS 5 / OPEN 5: the boundary is the stated number', () => {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DETECTORS, MAX_FREE, PERCENT_ROUNDS, cleanFree, findCredentials, maskText } from '../src/credentials.js';
+import { DETECTORS, PERCENT_ROUNDS, TOO_LONG, cleanFree, findCredentials, maskText } from '../src/credentials.js';
 import { maskDeep } from '../src/mask.js';
 import { createWorkspaces } from '../src/workspaces.js';
 import { C, K, A, newEngine, withServer, get, json, W } from './helpers.js';
@@ -54,27 +54,31 @@ test('zero-width, soft-hyphen, word-joiner, BOM and bidi characters are DELETED 
   }
   const full = [...SECRETS.skShort].map((c) => String.fromCharCode(c.charCodeAt(0) + 0xfee0)).join('').replace(/　/g, ' ');
   assert.match(cleanFree(`use ${full}`), /\[masked:api-key\]/, 'a fullwidth look-alike is normalised to ASCII and then masked');
-  assert.equal(cleanFree('a\u0000b\u202ec  d'), 'a bc d', 'a control character becomes a space, a bidi character is deleted');
+  assert.equal(cleanFree('a\u0000b\u202ec  d'), 'abc d', 'a control character and a bidi character are both DELETED (they used to become a space)');
+  assert.equal(cleanFree('a\tb\nc\rd'), 'a b c d', 'tab, newline and carriage return stay separators');
 });
 
-test('cleanFree: masks, collapses space, caps, and never throws', () => {
+test('cleanFree: masks, collapses space, never cuts, and never throws', () => {
   const v = SECRETS.github;
   assert.ok(!cleanFree(`token ${v}`).includes(v));
-  assert.equal(cleanFree('x'.repeat(5000)).length <= MAX_FREE, true);
+  assert.equal(cleanFree('x'.repeat(5000)), '[masked:key-like]', 'a long opaque run is masked whole');
+  assert.equal(cleanFree('plain words '.repeat(100)).length, 1199, 'plain text is NOT cut: 100 x 12 characters, the trailing space trimmed');
+  assert.equal(cleanFree('a '.repeat(100001)), TOO_LONG, 'text over 200,000 characters (here 200,002) is not scanned and not kept: one marker');
+  assert.equal(cleanFree('a'.repeat(200000)), '[masked:key-like]', '200,000 exactly is still scanned');
   assert.equal(cleanFree(undefined), ''); assert.equal(cleanFree(null), ''); assert.equal(cleanFree({}), '[object Object]');
   assert.equal(cleanFree('I need read access to review the change for the release'), 'I need read access to review the change for the release');
 });
 
-test('masking happens BEFORE the cut to length: a token that straddles the limit is masked, not half shown', () => {
+test('masking never leaves a fragment, wherever the token sits in a long text (the engine then refuses over-long input whole: see sweep.test.js)', () => {
   const v = SECRETS.github;
   for (let into = 1; into <= 8; into++) {
     const filler = 'x '.repeat(200).slice(0, 400 - into);
-    const out = cleanFree(`${filler}${v}`, 400);
-    assert.ok(out.length <= 400, `into ${into}`);
+    const out = cleanFree(`${filler}${v}`);
     for (let k = 2; k <= into; k++) assert.ok(!out.endsWith(v.slice(0, k)), `into ${into}: fragment ${v.slice(0, k)}`);
     assert.ok(!out.includes('ghp_'), `into ${into}`);
   }
-  assert.ok(!cleanFree(`${'a'.repeat(19990)} ${v}`, 400).includes('ghp_'));
+  assert.ok(!cleanFree(`${'a'.repeat(19990)} ${v}`).includes('ghp_'));
+  assert.ok(!cleanFree(`${'a '.repeat(9990)}password hunter2xyz`).includes('hunter2xyz'));
 });
 
 test('detectors are linear: hostile inputs of tens of thousands of characters finish (a catastrophic pattern would not)', () => {
@@ -116,7 +120,7 @@ test('a credential typed into a proposal reason, a comment or a retag value is m
   let n = 0;
   for (const [name, v] of Object.entries(SECRETS)) {
     n += 1;
-    const p = e.propose({ actor: K, agentId: 'ag-bedrock-01', kind: 'retag', params: { key: 'cost-center', value: `n${n}: ${v}` }, reason: `because ${v} works` });
+    const p = e.propose({ actor: K, agentId: 'ag-bedrock-01', kind: 'retag', params: { key: 'cost-center', value: `n${n}: ${v}`.length <= 40 ? `n${n}: ${v}` : `n${n}` }, reason: `because ${v} works` });
     e.decide({ actor: A, proposalId: p.proposalId, decision: 'approve', comment: `ok ${v}` });
     e.execute({ actor: A, proposalId: p.proposalId });
     const all = JSON.stringify([e.snapshot(), e.hops, e.s.audit, [...e.s.agents.values()]]);
@@ -160,9 +164,9 @@ test('F1 (stated limit): a password with no keyword before it, such as "login wi
   assert.equal(cleanFree('login with hunter2hunter2 please'), 'login with hunter2hunter2 please');
 });
 
-test('F1: the decoding is bounded to three rounds and keeps mask-before-truncate', () => {
+test('F1: the decoding is bounded to three rounds and masks wherever the value sits', () => {
   assert.equal(PERCENT_ROUNDS, 3);
   const pad = 'x '.repeat(190);
-  const out = cleanFree(`${pad}my%20pass` + 'word%20is%20Kiwi-Fruit-91', 400);
-  assert.ok(!out.includes('Kiwi') && out.length <= 400);
+  const out = cleanFree(`${pad}my%20pass` + 'word%20is%20Kiwi-Fruit-91');
+  assert.ok(!out.includes('Kiwi'));
 });

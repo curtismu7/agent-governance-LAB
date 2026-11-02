@@ -69,12 +69,17 @@ test('typing every credential shape into every field of every endpoint never ech
   for (const n of Object.values(NEEDLES)) assert.ok(!out.join('').includes(n.probe), 'nothing was logged');
 });
 
+let wsN = 0; // the workspace id must not itself be credential-looking ("echo-bearer" is refused)
 test('a credential in a real, accepted action is masked in the response, the hops, the proposals and the audit trail', async () => {
   await withServer(async (url) => {
     for (const [name, n] of Object.entries(NEEDLES)) {
-      const ws = `echo-${name.toLowerCase()}`.slice(0, 30).replace(/[^a-z0-9-]/g, '-'); const W = { 'x-workspace': ws };
-      const r = await post(url, '/api/proposals', live({ proposal: { actor: K, agentId: 'ag-bedrock-02', kind: 'retag', params: { key: 'data-class', value: `v ${n.raw}` }, reason: `please ${n.raw} thanks` } }), W);
-      const body = await r.text();
+      const ws = `echo-w${wsN++}`; const W = { 'x-workspace': ws };
+      // the tag value is at most 40 characters as typed: a longer value is refused whole (and must not come back either)
+      const val = `v ${n.raw}`;
+      const propose = (value) => post(url, '/api/proposals', live({ proposal: { actor: K, agentId: 'ag-bedrock-02', kind: 'retag', params: { key: 'data-class', value }, reason: `please ${n.raw} thanks` } }), W);
+      let r = await propose(val); let body = await r.text();
+      assert.equal(r.status, val.length <= 40 ? 200 : 400, name);
+      if (r.status === 400) { assert.ok(!body.includes(n.probe), `${name}: not in the refusal`); r = await propose('plain'); body = await r.text(); }
       assert.equal(r.status, 200, name); assert.ok(!body.includes(n.probe), `${name}: not in the answer`); assert.match(body, /\[masked:/);
       const id = JSON.parse(body).result.proposalId;
       const d = await post(url, `/api/proposals/${id}/decision`, live({ decision: { actor: A, decision: 'approve', comment: `ok ${n.raw}` } }), W); const db = await d.text();

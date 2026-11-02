@@ -40,6 +40,35 @@ export const SECRETS = {
   pctMixed: ['api%20key', '%3A%20Mm44ppQQrr'].join(''),
   apiKeySpace: ['api k', 'ey: Rr88ttYYuu'].join(''),
   pwdDash: ['p', 'wd - Kk99Jj88Hh'].join(''),
+  // sweep class A: C0/C1 control characters inside a keyword (they are DELETED, so the keyword is whole again)
+  ctrlSoh: ['p\x01a\x01s\x01s\x01w\x01o\x01r\x01d', ': hunter2xyz'].join(''),
+  ctrlNul: ['pass\x00', 'word=hunter2xyz'].join(''),
+  ctrlNel: ['pass\x85', 'word=hunter2xyz'].join(''),
+  ctrlDel: ['pass\x7f', 'word=hunter2xyz'].join(''),
+  ctrlIs: ['my pa\x00ss\x00', 'word is hunter2xyz'].join(''),
+  ctrlToken: ['tok\x01', 'en hunter2xyz'].join(''),
+  ctrlBearer: ['Bea\x01', 'rer hunter2xyz'].join(''),
+  ctrlSk: ['s\x01k', '-abcdefghijklmnop1234'].join(''),
+  ctrlTab: ['pass\t', 'word=hunter2xyz'].join(''),
+  ctrlTabIs: ['my pass\n', 'word is hunter2xyz'].join(''), // only the second look (separators deleted) finds this one: pass + space + word has no digit
+  // sweep class B: a keyword and a plain space, then a value of 6+ characters that holds a digit
+  spPassword: ['pass', 'word hunter2xyz'].join(''),
+  spPw: ['p', 'w hunter2xyz'].join(''),
+  spToken: ['tok', 'en hunter2xyz'].join(''),
+  spSecret: ['sec', 'ret hunter2xyz'].join(''),
+  spApiKey: ['api ', 'key hunter2xyz'].join(''),
+  spKeyIs: ['the k', 'ey is hunter2xyz'].join(''),
+  spPlus: ['pass', 'word+hunter2xyz'].join(''),
+  // sweep class C: user:password@host with and without a scheme
+  uiNoScheme: ['bob:', 'hunter2xyz@host.example'].join(''),
+  uiSlashes: ['//bob:', 'hunter2xyz@host.example'].join(''),
+  uiScheme: ['https://bob:', 'hunter2xyz@host.example'].join(''),
+  uiAt: ['https://bob:', 'hunter2xyz@@host.example/x'].join(''),
+  // sweep class D: JSON text with a quoted key
+  jsonPassword: ['{"pass', 'word":"hunter2xyz"}'].join(''),
+  jsonSpaced: ['{ "api', 'Key" : "hunter2xyz" }'].join(''),
+  jsonSingle: ["{'tok", "en': 'hunter2xyz'}"].join(''),
+  jsonGlued: ['{"my_pass', 'word":"hunter2xyz","x":1}'].join(''),
   // personal-looking data
   ssn: ['123-', '45-', '6789'].join(''),
   email: ['jane.doe', '@gmail.com'].join(''),
@@ -55,6 +84,9 @@ export const NEEDLE = {
   plainIs: 'Tr0ub4dor', passcode: 'zebra-Quartz', pwEq: 'Hunter2Hunter2', pin: '482915', passphrase: 'correct horse', userinfo: 'Sup3rS3cretPw', authToken: 'abc123SECRETvalue', authBasic: ['dXNlcjpw', 'YXNzd29yZA'].join(''), google: ['a0AfH6SM', 'BxQ1w2e3'].join(''),
   accountKey: ['abcdEFGH', '1234'].join(''), sessionId: ['00D5g00000', '8dkQz'].join(''), key31: ['Zq9Xk2Lm', '8Rt4Vb7N'].join(''), shortGh: 'shortone1234', skShort: 'ab12cd34', secretIs: 'Zx9Kq2Lm5Vb',
   pctSpace: 'Kiwi-Fruit-91', pctTwice: 'Tr0ub4dorXyz', pctThrice: 'Zx8Ww7Vv6Uu', pctMixed: 'Mm44ppQQrr', apiKeySpace: 'Rr88ttYYuu', pwdDash: 'Kk99Jj88Hh',
+  ctrlSoh: 'hunter2xyz', ctrlNul: 'hunter2xyz', ctrlNel: 'hunter2xyz', ctrlDel: 'hunter2xyz', ctrlIs: 'hunter2xyz', ctrlToken: 'hunter2xyz', ctrlBearer: 'hunter2xyz', ctrlSk: 'abcdefghijklmnop', ctrlTab: 'hunter2xyz', ctrlTabIs: 'hunter2xyz',
+  spPassword: 'hunter2xyz', spPw: 'hunter2xyz', spToken: 'hunter2xyz', spSecret: 'hunter2xyz', spApiKey: 'hunter2xyz', spKeyIs: 'hunter2xyz', spPlus: 'hunter2xyz',
+  uiNoScheme: 'hunter2xyz', uiSlashes: 'hunter2xyz', uiScheme: 'hunter2xyz', uiAt: 'hunter2xyz', jsonPassword: 'hunter2xyz', jsonSpaced: 'hunter2xyz', jsonSingle: 'hunter2xyz', jsonGlued: 'hunter2xyz',
   zeroWidth: 'Qw3rTy9Uio1Pas7Dfg', bom: 'Nb7Hc4Jd6Fa0Sg', wordJoiner: 'BNMASDFGHJKL', ssn: '123-45-6789', email: 'jane.doe', card: '4111 1111 1111', cardDashes: '4111-1111-1111', phone: '555 0134', phoneUs: '555-0134',
 };
 // What must NOT be masked: ordinary prose, ids, dates, resource and policy names.
@@ -69,4 +101,8 @@ export const PLAIN = [
   'see https://gw1.fabrikam.example and https://github.example/payments-api/pull/123 and the incident write-up',
   'the handbook says 100%25 of reviews need two approvers, see 50%2B coverage and password - see the handbook',
   'order 4111 1111 1111 1112 is not a card number (it fails the check digit)',
+  'the password reset link, the token requirements and the pw reset steps are in the handbook',
+  'secret rotation is quarterly, api key rotation is monthly, and tokens expire after eight hours',
+  'a password manager holds each secret; the key is under review; passwords expire',
+  'ask about the api key policy, the credential review and the pass through rule',
 ];
