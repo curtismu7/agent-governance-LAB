@@ -3,7 +3,7 @@
 A simulation of Ping's AI Platform Agents release claims: a cross-cloud inventory of agents across thirteen sources, a permission review with a five-level risk score, a named custodian for every agent with administrator approval before any custodian action runs, remediation, a sync that never mistakes silence for deletion, governance of the AgentCore gateway itself, and private-network discovery.
 
 Tier: Demo
-Repo: https://github.com/ping-sandbox/agent-governance-LAB
+Repo: https://github.com/curtismu7/agent-governance-LAB
 Catalog: D105
 
 **Tier: Demo.** Source: the Ping ID4AI Workforce H2 2026 deck, slides 18, 19, 21, 35, 45 and 58, release 2026-11-02. **Every product claim is a Ping release claim, UNVERIFIED on our tenant.** Nothing here calls a real cloud, provider API, gateway, identity provider or tenant, and nothing leaves your machine.
@@ -51,7 +51,7 @@ Each field is tagged in the app as "deck claim", "console swagger name (schema o
 Prerequisites: Node 26 or newer. Docker only if you use the Docker form. Mock mode works with no setup at all: no tenant, no credentials, no settings file.
 
 ```
-git clone https://github.com/ping-sandbox/agent-governance-LAB.git
+git clone https://github.com/curtismu7/agent-governance-LAB.git
 cd agent-governance-LAB
 npm ci
 npm run build
