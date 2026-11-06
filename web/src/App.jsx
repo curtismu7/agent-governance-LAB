@@ -10,6 +10,7 @@ import TalkTrack from "./components/TalkTrack";
 import LastAction from "./components/LastAction";
 import useLab from "./hooks/useLab";
 import { getJson, resetWorkspace } from "./api";
+import ShelfLink from "./components/ShelfLink";
 
 export const TABS = [
   { id: "inventory", label: "Inventory" },
@@ -107,6 +108,7 @@ export default function App() {
             {!presenter && story && <p className="head__intro">{story.intro}</p>}
           </div>
           <div className="head__tools">
+            <ShelfLink />
             <div className="seg" role="group" aria-label="Mode">
               <button type="button" aria-pressed={mode === "mock"} onClick={() => setMode("mock")} data-testid="mode-mock">Mock</button>
               <button type="button" aria-pressed={mode === "live"} onClick={() => setMode("live")} data-testid="mode-live">Live</button>

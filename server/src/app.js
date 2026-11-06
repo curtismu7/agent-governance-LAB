@@ -16,13 +16,14 @@ import { MOCK_TABLE } from './mockTable.js';
 import { createWorkspaces, workspaceFrom } from './workspaces.js';
 import { liveState, mockState, runAction } from './service.js';
 import { maskDeep } from './mask.js';
+import { shelfInfo } from './shelfLink.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIST = process.env.WEB_DIST || path.resolve(HERE, '../../web/dist');
 const CONFIG = process.env.CUSTOMER_CONFIG || path.resolve(HERE, '../../customer.config.json');
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
-export function createApp({ health = createHealth(), configFile = CONFIG, workspaces = createWorkspaces(), table = MOCK_TABLE, webDist = WEB_DIST } = {}) {
+export function createApp({ health = createHealth(), configFile = CONFIG, workspaces = createWorkspaces(), table = MOCK_TABLE, webDist = WEB_DIST, env = process.env } = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.use(hostCheck);
@@ -34,6 +35,7 @@ export function createApp({ health = createHealth(), configFile = CONFIG, worksp
   // Defence in depth: every JSON answer is masked for credential-shaped values, whatever path produced it.
   api.use((_req, res, next) => { const send = res.json.bind(res); res.json = (b) => send(maskDeep(b)); next(); });
   api.use('/health', health.router);
+  api.get('/shelf', (_req, res) => { noStore(res); res.json(shelfInfo(env)); });
   const verticalOf = (req) => verticalFrom(req.body?.vertical ?? req.query.vertical);
   const castFor = (req) => loadCast(configFile, verticalOf(req));
   const noStore = (res) => res.set('Cache-Control', 'no-store');
@@ -100,6 +102,7 @@ export function createApp({ health = createHealth(), configFile = CONFIG, worksp
   // Reset clears this workspace's engines (requests, grants, receipts, platform state, outbox, audit, the clock) and nothing else.
   known('post', '/reset');
   api.post('/reset', (req, res) => { const id = ws(req, res); if (!id) return; noStore(res); workspaces.reset(id); return res.json({ reset: 'ok', workspace: id }); });
+  known('get', '/shelf');
   for (const [route, methods] of methodsOf) api.all(route, (_req, res) => res.set('Allow', [...new Set(methods)].join(', ')).status(405).json({ error: 'method_not_allowed' }));
   api.use((_req, res) => res.status(404).json({ error: 'not_found' }));
   app.use('/api', api);

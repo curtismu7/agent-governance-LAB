@@ -255,3 +255,13 @@ test('F5: the page is served for routes only; a missing file (/assets/nope.js, /
     }, { webDist: dist });
   } finally { fs.rmSync(dist, { recursive: true, force: true }); }
 });
+
+test('GET /api/shelf answers the shelf URL (null when unconfigured)', async () => {
+  await withServer(async (url) => {
+    const res = await get(url, '/api/shelf');
+    assert.equal(res.status, 200);
+    const body = await json(res);
+    assert.deepEqual(Object.keys(body), ['shelfUrl']);
+    assert.equal(body.shelfUrl, null);
+  }, { env: {} });
+});
