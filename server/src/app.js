@@ -46,9 +46,26 @@ export function createApp({ health = createHealth(), configFile = CONFIG, worksp
   const known = (method, route) => methodsOf.set(route, [...(methodsOf.get(route) || []), method.toUpperCase()]);
 
   for (const r of ['/story', '/diagram', '/info', '/state']) known('get', r);
+  known('post', '/mode');
   api.get('/story', (req, res) => { noStore(res); res.json(buildStory(castFor(req), verticalOf(req))); });
   api.get('/diagram', (req, res) => { noStore(res); res.json(buildDiagram(castFor(req), DIAGRAM_NAMES.includes(req.query.name) ? req.query.name : DIAGRAM_NAMES[0])); });
-  api.get('/info', (_req, res) => { noStore(res); res.json({ mode: defaultMode(), modes: ['mock', 'live'], simulated: true, release: '2026-11-02', unverified: true }); });
+  // Rule 19: the Mock/Real toggle reads this. The server holds the mode; both are available (mock tables and the loopback live engine).
+  // The wire value of source is mock|real; this lab's internal mode is mock|live, and real means live here.
+  let current = defaultMode();
+  const toSource = (m) => (m === 'live' ? 'real' : m);
+  const toMode = (s) => (s === 'real' ? 'live' : s);
+  const modeView = () => ({ mode: current, source: toSource(current), realAvailable: true, realReason: null });
+  api.get('/info', (_req, res) => { noStore(res); res.json({ mode: current, source: toSource(current), realAvailable: true, realReason: null, modes: ['mock', 'live'], simulated: true, release: '2026-11-02', unverified: true }); });
+  // Rule 19: switching is server-side. The body is exactly { source: "mock" | "real" }.
+  api.post('/mode', (req, res) => {
+    noStore(res);
+    const b = bodyOf(req);
+    const next = b.source;
+    if (next !== 'mock' && next !== 'real') return res.status(400).json({ error: 'bad_mode', detail: 'source must be exactly "mock" or "real"' });
+    if (!Object.keys(b).every((k) => k === 'source')) return res.status(400).json({ error: 'unknown_field', detail: 'the body takes only source' });
+    current = toMode(next);
+    return res.json(modeView());
+  });
 
   api.get('/state', (req, res) => {
     const id = ws(req, res); if (!id) return;

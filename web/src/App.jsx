@@ -9,7 +9,7 @@ import DiagramTab from "./components/DiagramTab";
 import TalkTrack from "./components/TalkTrack";
 import LastAction from "./components/LastAction";
 import useLab from "./hooks/useLab";
-import { getJson, resetWorkspace } from "./api";
+import { getJson, postJson, resetWorkspace } from "./api";
 import ShelfLink from "./components/ShelfLink";
 
 export const TABS = [
@@ -25,11 +25,9 @@ export const TABS = [
 // The banner is never blank and never claims one mode before it knows: until the story answers it says both, honestly.
 const TAIL = "Every product claim is a Ping release claim, UNVERIFIED on our tenant (release 2026-11-02). Nothing here calls a real cloud, provider API, gateway or tenant.";
 export const BANNER_UNKNOWN = `SIMULATED, MOCK or LIVE mode (loopback only, no outbound network). ${TAIL}`;
-const MODE_KEY = "agl.mode";
 const WRITE_TABS = ["inventory", "ownership", "sync", "gateway", "private"];
 
 const tabFromHash = () => { const h = window.location.hash.replace("#", ""); return TABS.some((t) => t.id === h) ? h : "inventory"; };
-const savedMode = () => { try { const m = window.localStorage.getItem(MODE_KEY); return m === "live" || m === "mock" ? m : null; } catch { return null; } };
 
 export default function App() {
   const [vertical, setVertical] = useState("finance");
@@ -45,7 +43,7 @@ export default function App() {
   const tabsRef = useRef(null);
   const lab = useLab({ mode, vertical, scenario: scenarioId });
 
-  useEffect(() => { getJson("/api/info").then((i) => setModeState((m) => m || savedMode() || i.mode), () => setModeState((m) => m || savedMode() || "mock")); }, []);
+  useEffect(() => { getJson("/api/info").then((i) => setModeState((m) => m || i.mode || i.source), () => setModeState((m) => m || "mock")); }, []);
   useEffect(() => {
     let live = true; // a late story for a vertical the visitor has already left is dropped
     getJson(`/api/story?vertical=${encodeURIComponent(vertical)}`).then((j) => { if (live) { setStory(j); setError(null); } }, (e) => { if (live) setError(e.message); });
@@ -56,7 +54,16 @@ export default function App() {
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
   }, []);
-  const setMode = (m) => { setModeState(m); try { window.localStorage.setItem(MODE_KEY, m); } catch { /* storage blocked */ } };
+  // Rule 19: switching is a server call (POST /api/mode with exactly {source}), then the data reloads so the banner,
+  // mode chip and every tab reflect the mode the server answered with.
+  const [modeError, setModeError] = useState(null);
+  const setMode = async (m) => {
+    setModeError(null);
+    const r = await postJson("/api/mode", { source: m === "live" ? "real" : "mock" });
+    if (!r.ok) { setModeError(r.body?.detail || r.body?.error || `HTTP ${r.status}`); return; }
+    setModeState(r.body?.mode || m);
+    await lab.reload();
+  };
   const select = (id) => { setTab(id); try { window.history.replaceState(null, "", `#${id}`); } catch { /* ignore */ } };
 
   // Keep the active tab fully in view in the scrolling tab strip (375px).
@@ -102,6 +109,7 @@ export default function App() {
     <div className={`app${presenter ? " app--presenter" : ""}`}>
       <header>
         <p className="banner" role="status" data-state={mode === "live" ? "live" : "mock"} data-testid="banner">{banner}</p>
+        {modeError && <p className="app-error" role="alert" data-testid="mode-error">{modeError}</p>}
         <div className="head">
           <div>
             <h1 className="head__title">Agent Governance LAB</h1>

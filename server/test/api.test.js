@@ -26,6 +26,30 @@ test('health, info and story answer; the story fills every token for every verti
   });
 });
 
+test('rule 19: POST /api/mode takes exactly {source: mock|real}, holds the mode server-side, and /api/info reports it', async () => {
+  await withServer(async (url) => {
+    let info = await json(await get(url, '/api/info'));
+    assert.equal(info.source, 'mock'); assert.equal(info.mode, 'mock'); assert.equal(info.realAvailable, true);
+    let r = await post(url, '/api/mode', { source: 'real' });
+    assert.equal(r.status, 200);
+    let body = await r.json();
+    assert.equal(body.source, 'real'); assert.equal(body.mode, 'live');
+    info = await json(await get(url, '/api/info'));
+    assert.equal(info.source, 'real'); assert.equal(info.mode, 'live');
+    // real→mock switches back
+    r = await post(url, '/api/mode', { source: 'mock' });
+    assert.equal(r.status, 200);
+    assert.equal((await r.json()).source, 'mock');
+    info = await json(await get(url, '/api/info'));
+    assert.equal(info.source, 'mock');
+    // the body must be exactly {source}: anything else is 400
+    for (const b of [{ source: 'live' }, { mode: 'live' }, {}, { source: 'real', extra: 1 }]) {
+      const rr = await post(url, '/api/mode', b);
+      assert.ok(rr.status === 400 || rr.status === 404, JSON.stringify(b));
+    }
+  });
+});
+
 test('the state: Mock gives a generated scenario, Live gives the workspace engine, both the same shape', async () => {
   await withServer(async (url) => {
     const m = await json(await get(url, '/api/state?mode=mock&vertical=finance&scenario=partial-failure'));
