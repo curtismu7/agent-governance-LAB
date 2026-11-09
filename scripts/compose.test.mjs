@@ -56,3 +56,9 @@ test('the container is locked down: read-only fs, no capabilities, no new privil
 test('compose passes a usable SHELF_URL so the header Shelf button shows in Docker', () => {
   assert.match(here('docker-compose.yml'), /SHELF_URL:\s*\$\{SHELF_URL:-http:\/\/127\.0\.0\.1:4400\}/);
 });
+
+test('docker-compose.yml allows the family lab-proxy name by default, never the bare launcher name', () => {
+  const compose = fs.readFileSync(new URL('../docker-compose.yml', import.meta.url), 'utf8');
+  assert.match(compose, /LAB_ALLOWED_HOSTS: \$\{LAB_ALLOWED_HOSTS:-agent-governance-lab\.local\.ping-devops\.com\}\n/);
+  assert.doesNotMatch(compose, /LAB_ALLOWED_HOSTS:[^\n]*[-,]local\.ping-devops\.com\b/);
+});
