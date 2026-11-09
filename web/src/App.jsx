@@ -11,6 +11,8 @@ import LastAction from "./components/LastAction";
 import useLab from "./hooks/useLab";
 import { getJson, postJson, resetWorkspace } from "./api";
 import ShelfLink from "./components/ShelfLink";
+// Opened from Customer Agent LAB (UC-NHI1 routes here): strip + header Back only; no tab or vertical is preselected.
+import ReturnLink from "./return-link/ReturnLink.jsx";
 
 export const TABS = [
   { id: "inventory", label: "Inventory" },
@@ -109,6 +111,7 @@ export default function App() {
     <div className={`app${presenter ? " app--presenter" : ""}`}>
       <header>
         <p className="banner" role="status" data-state={mode === "live" ? "live" : "mock"} data-testid="banner">{banner}</p>
+        <ReturnLink app="agent-governance-lab" />
         {modeError && <p className="app-error" role="alert" data-testid="mode-error">{modeError}</p>}
         <div className="head">
           <div>
@@ -116,6 +119,7 @@ export default function App() {
             {!presenter && story && <p className="head__intro">{story.intro}</p>}
           </div>
           <div className="head__tools">
+            <ReturnLink app="agent-governance-lab" variant="header" />
             <ShelfLink />
             <div className="seg" role="group" aria-label="Mode">
               <button type="button" aria-pressed={mode === "mock"} onClick={() => setMode("mock")} data-testid="mode-mock">Mock</button>
