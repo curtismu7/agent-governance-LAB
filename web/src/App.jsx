@@ -11,6 +11,7 @@ import LastAction from "./components/LastAction";
 import useLab from "./hooks/useLab";
 import { getJson, postJson, resetWorkspace } from "./api";
 import ShelfLink from "./components/ShelfLink";
+import TopMenu, { applyFontSize } from "./top-menu/TopMenu.jsx";
 // Opened from Customer Agent LAB (UC-NHI1 routes here): strip + header Back only; no tab or vertical is preselected.
 import ReturnLink from "./return-link/ReturnLink.jsx";
 
@@ -30,6 +31,9 @@ export const BANNER_UNKNOWN = `SIMULATED, MOCK or LIVE mode (loopback only, no o
 const WRITE_TABS = ["inventory", "ownership", "sync", "gateway", "private"];
 
 const tabFromHash = () => { const h = window.location.hash.replace("#", ""); return TABS.some((t) => t.id === h) ? h : "inventory"; };
+const THEMES = ["auto", "light", "dark"];
+const savedTheme = () => { try { const t = window.localStorage.getItem("agov.theme"); return THEMES.includes(t) ? t : "auto"; } catch { return "auto"; } };
+const savedFont = () => { try { const f = window.localStorage.getItem("agov.font"); return ["S", "M", "L"].includes(f) ? f : "M"; } catch { return "M"; } };
 
 export default function App() {
   const [vertical, setVertical] = useState("finance");
@@ -42,10 +46,21 @@ export default function App() {
   const [resetSignal, setResetSignal] = useState(0);
   const [resetMsg, setResetMsg] = useState("");
   const [actorChoice, setActor] = useState("");
+  const [theme, setTheme] = useState(savedTheme);
+  const [fontStep, setFontStep] = useState(savedFont);
   const tabsRef = useRef(null);
   const lab = useLab({ mode, vertical, scenario: scenarioId });
 
   useEffect(() => { getJson("/api/info").then((i) => setModeState((m) => m || i.mode || i.source), () => setModeState((m) => m || "mock")); }, []);
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", theme);
+    try { window.localStorage.setItem("agov.theme", theme); } catch { /* storage blocked */ }
+  }, [theme]);
+  useEffect(() => {
+    applyFontSize(fontStep);
+    try { window.localStorage.setItem("agov.font", fontStep); } catch { /* storage blocked */ }
+  }, [fontStep]);
   useEffect(() => {
     let live = true; // a late story for a vertical the visitor has already left is dropped
     getJson(`/api/story?vertical=${encodeURIComponent(vertical)}`).then((j) => { if (live) { setStory(j); setError(null); } }, (e) => { if (live) setError(e.message); });
@@ -61,7 +76,7 @@ export default function App() {
   const [modeError, setModeError] = useState(null);
   const setMode = async (m) => {
     setModeError(null);
-    const r = await postJson("/api/mode", { source: m === "live" ? "real" : "mock" });
+    const r = await postJson("/api/mode", { source: m === "real" ? "real" : "mock" });
     if (!r.ok) { setModeError(r.body?.detail || r.body?.error || `HTTP ${r.status}`); return; }
     setModeState(r.body?.mode || m);
     await lab.reload();
@@ -120,19 +135,18 @@ export default function App() {
           </div>
           <div className="head__tools">
             <ReturnLink app="agent-governance-lab" variant="header" />
-            <ShelfLink />
-            <div className="seg" role="group" aria-label="Mode">
-              <button type="button" aria-pressed={mode === "mock"} onClick={() => setMode("mock")} data-testid="mode-mock">Mock</button>
-              <button type="button" aria-pressed={mode === "live"} onClick={() => setMode("live")} data-testid="mode-live">Live</button>
-            </div>
+            <TopMenu
+              mode={{ value: mode === "live" ? "real" : "mock", onChange: setMode, realAvailable: true }}
+              vertical={{ value: vertical, onChange: setVertical, options: story ? story.verticals : ["finance"] }}
+              theme={{ value: theme, onChange: setTheme }}
+              fontSize={{ value: fontStep, onChange: setFontStep }}
+              present={{ active: presenter, onToggle: () => setPresenter((v) => !v), label: "Presenter (P)" }}
+              help={{ href: "https://github.com/curtismu7/agent-governance-LAB#readme" }}
+              onReset={reset}
+            >
+              <ShelfLink />
+            </TopMenu>
             <span className="chip" data-testid="mode">Mode: {mode || "..."}{mode === "live" ? " (local engine, loopback)" : mode === "mock" ? " (tables)" : ""}</span>
-            {!presenter && (
-              <label className="inline">Vertical{" "}
-                <select value={vertical} onChange={(e) => setVertical(e.target.value)} data-testid="vertical">
-                  {(story ? story.verticals : ["finance"]).map((v) => <option key={v} value={v}>{v}</option>)}
-                </select>
-              </label>
-            )}
             {!presenter && mode === "live" && roster.length > 0 && (
               <label className="inline">Act as{" "}
                 <select value={actor} onChange={(e) => setActor(e.target.value)} data-testid="actor">
@@ -140,8 +154,6 @@ export default function App() {
                 </select>
               </label>
             )}
-            <button type="button" onClick={reset} data-testid="reset">Reset</button>
-            <button type="button" aria-pressed={presenter} onClick={() => setPresenter((v) => !v)} data-testid="presenter">{presenter ? "Exit presenter (Esc)" : "Presenter (P)"}</button>
           </div>
         </div>
       </header>

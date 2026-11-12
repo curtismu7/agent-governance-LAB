@@ -55,7 +55,7 @@ export function createApp({ health = createHealth(), configFile = CONFIG, worksp
   const toSource = (m) => (m === 'live' ? 'real' : m);
   const toMode = (s) => (s === 'real' ? 'live' : s);
   const modeView = () => ({ mode: current, source: toSource(current), realAvailable: true, realReason: null });
-  api.get('/info', (_req, res) => { noStore(res); res.json({ mode: current, source: toSource(current), realAvailable: true, realReason: null, modes: ['mock', 'live'], simulated: true, release: '2026-11-02', unverified: true }); });
+  api.get('/info', (_req, res) => { noStore(res); let version = null; try { version = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '../../package.json'), 'utf8')).version || null; } catch { /* no version */ } res.json({ mode: current, source: toSource(current), realAvailable: true, realReason: null, modes: ['mock', 'live'], simulated: true, release: '2026-11-02', unverified: true, version }); });
   // Rule 19: switching is server-side. The body is exactly { source: "mock" | "real" }.
   api.post('/mode', (req, res) => {
     noStore(res);
