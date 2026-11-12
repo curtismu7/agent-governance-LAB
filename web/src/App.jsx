@@ -38,6 +38,7 @@ const savedFont = () => { try { const f = window.localStorage.getItem("agov.font
 export default function App() {
   const [vertical, setVertical] = useState("finance");
   const [story, setStory] = useState(null);
+  const [info, setInfo] = useState(null);
   const [mode, setModeState] = useState(null);
   const [scenarioId, setScenarioId] = useState(null);
   const [error, setError] = useState(null);
@@ -51,7 +52,7 @@ export default function App() {
   const tabsRef = useRef(null);
   const lab = useLab({ mode, vertical, scenario: scenarioId });
 
-  useEffect(() => { getJson("/api/info").then((i) => setModeState((m) => m || i.mode || i.source), () => setModeState((m) => m || "mock")); }, []);
+  useEffect(() => { getJson("/api/info").then((i) => { setInfo(i); setModeState((m) => m || i.mode || i.source); }, () => setModeState((m) => m || "mock")); }, []);
   useEffect(() => {
     const root = document.documentElement;
     if (theme === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", theme);
@@ -142,6 +143,7 @@ export default function App() {
               fontSize={{ value: fontStep, onChange: setFontStep }}
               present={{ active: presenter, onToggle: () => setPresenter((v) => !v), label: "Presenter (P)" }}
               help={{ href: "https://github.com/curtismu7/agent-governance-LAB#readme" }}
+              version={info?.version || null}
               onReset={reset}
             >
               <ShelfLink />
