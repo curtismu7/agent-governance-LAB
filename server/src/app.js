@@ -14,9 +14,12 @@ import { DIAGRAM_NAMES, buildDiagram } from './diagramData.js';
 import { InputError } from './errors.js';
 import { MOCK_TABLE } from './mockTable.js';
 import { createWorkspaces, workspaceFrom } from './workspaces.js';
-import { liveState, mockState, runAction } from './service.js';
+import { liveState, mockState, runAction, privilegeState } from './service.js';
 import { maskDeep } from './mask.js';
 import { shelfInfo } from './shelfLink.js';
+import { privilegeConfig } from './privilegeConfig.js';
+import { createPrivilegeClient, fetchConsoleCert } from './privilegeClient.js';
+import { mapApplications, mapGateways } from './privilegeMap.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIST = process.env.WEB_DIST || path.resolve(HERE, '../../web/dist');
@@ -49,30 +52,55 @@ export function createApp({ health = createHealth(), configFile = CONFIG, worksp
   known('post', '/mode');
   api.get('/story', (req, res) => { noStore(res); res.json(buildStory(castFor(req), verticalOf(req))); });
   api.get('/diagram', (req, res) => { noStore(res); res.json(buildDiagram(castFor(req), DIAGRAM_NAMES.includes(req.query.name) ? req.query.name : DIAGRAM_NAMES[0])); });
-  // Rule 19: the Mock/Real toggle reads this. The server holds the mode; both are available (mock tables and the loopback live engine).
-  // The wire value of source is mock|real; this lab's internal mode is mock|live, and real means live here.
+  // Rule 19: the Mock/Real toggle reads this. The server holds the mode; mock and live are always available; privilege (Real in
+  // the UI) is available when the AGL_PRIV_* settings are present (owner rule 2026-11-14). The wire value of source is mock|real;
+  // the internal modes are mock|live|privilege, and "real" means privilege when it is configured, else live.
   let current = defaultMode();
-  const toSource = (m) => (m === 'live' ? 'real' : m);
-  const toMode = (s) => (s === 'real' ? 'live' : s);
-  const modeView = () => ({ mode: current, source: toSource(current), realAvailable: true, realReason: null });
-  api.get('/info', (_req, res) => { noStore(res); let version = null; try { version = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '../../package.json'), 'utf8')).version || null; } catch { /* no version */ } res.json({ mode: current, source: toSource(current), realAvailable: true, realReason: null, modes: ['mock', 'live'], simulated: true, release: '2026-11-02', unverified: true, version }); });
-  // Rule 19: switching is server-side. The body is exactly { source: "mock" | "real" }.
-  api.post('/mode', (req, res) => {
+  let privilegeWorld = null; // the live Privilege mapping, set when the toggle resolves Real to the privilege mode
+  const privCfg = () => privilegeConfig(env);
+  const realTarget = () => (privCfg().ok ? 'privilege' : 'live');
+  const toSource = (m) => (m === 'live' ? 'real' : m === 'privilege' ? 'real' : m);
+  const toMode = (s) => (s === 'real' ? realTarget() : s);
+  const modeView = () => { const c = privCfg(); return { mode: current, source: toSource(current), realAvailable: true, realReason: c.ok ? null : c.problem }; };
+  const infoView = () => ({ ...modeView(), modes: ['mock', 'live', ...(privCfg().ok ? ['privilege'] : [])], simulated: current !== 'privilege', release: '2026-11-02', unverified: true, version: null });
+  api.get('/info', (_req, res) => { noStore(res); let version = null; try { version = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '../../package.json'), 'utf8')).version || null; } catch { /* no version */ } res.json({ ...infoView(), version }); });
+  // Rule 19: switching is server-side. The body is exactly { source: "mock" | "real" }. Real is resolved at switch time: with the
+  // AGL_PRIV_* settings present it opens the live Privilege mode (one read-only console fetch, pinned origin), without them it is
+  // the loopback live engine, honestly labelled.
+  api.post('/mode', async (req, res) => {
     noStore(res);
     const b = bodyOf(req);
     const next = b.source;
     if (next !== 'mock' && next !== 'real') return res.status(400).json({ error: 'bad_mode', detail: 'source must be exactly "mock" or "real"' });
     if (!Object.keys(b).every((k) => k === 'source')) return res.status(400).json({ error: 'unknown_field', detail: 'the body takes only source' });
-    current = toMode(next);
-    return res.json(modeView());
+    const cfg = privCfg();
+    const target = next === 'real' ? (cfg.ok ? 'privilege' : 'live') : 'mock';
+    if (next === 'real' && !cfg.ok) { current = 'live'; return res.json({ ...modeView(), note: 'real_without_privilege_settings' }); }
+    if (target === 'privilege' && current !== 'privilege') {
+      try {
+        // The local console serves a self-signed chain whose root is pinned on first use (AGL_PRIV_CA names a PEM to trust
+        // instead); either way the lab trusts exactly that chain for this origin and nothing else. A plain-http origin
+        // (tests, loopback) needs no certificate.
+        const ca = cfg.ca || (new URL(cfg.origin).protocol === 'https:' ? await fetchConsoleCert(cfg.host, new URL(cfg.origin).port || 443) : null);
+        const client = createPrivilegeClient({ origin: cfg.origin, tenant: cfg.tenant, key: cfg.key, secret: cfg.secret, ca });
+        const raw = await client.fetchAll();
+        privilegeWorld = { agents: mapApplications(raw), gateways: mapGateways(raw), fetchedAt: new Date().toISOString(), origin: cfg.origin };
+      } catch (e) {
+        return res.status(502).json({ error: 'console_unreachable', detail: e.detail || 'the Privilege console did not answer' });
+      }
+    }
+    current = target;
+    if (target !== 'privilege') privilegeWorld = null;
+    return res.json({ ...modeView(), fetchedAt: privilegeWorld?.fetchedAt || null });
   });
 
   api.get('/state', (req, res) => {
     const id = ws(req, res); if (!id) return;
     noStore(res);
-    const mode = modeOf(req.query.mode); if (!mode) return res.status(400).json({ error: 'bad_mode', detail: 'mode must be mock or live' });
+    const mode = modeOf(req.query.mode); if (!mode) return res.status(400).json({ error: 'bad_mode', detail: 'mode must be mock, live or privilege' });
     const vertical = verticalOf(req);
     if (mode === 'mock') return res.json({ mode, vertical, workspace: id, ...mockState(table, vertical, req.query.scenario) });
+    if (mode === 'privilege') return res.json({ mode, vertical, workspace: id, state: privilegeState(id, workspaces, vertical, castFor(req), privilegeWorld) });
     return res.json({ mode, vertical, workspace: id, state: liveState(id, workspaces, vertical, castFor(req)) });
   });
 
@@ -85,11 +113,12 @@ export function createApp({ health = createHealth(), configFile = CONFIG, worksp
       try {
         if (!isObj(req.body)) return res.status(400).json({ error: 'bad_request' });
         const mode = modeOf(req.body.mode);
-        if (!mode) return res.status(400).json({ error: 'bad_mode', detail: 'mode must be mock or live' });
+        if (!mode) return res.status(400).json({ error: 'bad_mode', detail: 'mode must be mock, live or privilege' });
         if (mode === 'mock') return res.status(409).json({ error: 'mock_is_read_only', detail: 'Mock mode only reads tables: switch to Live to act' });
         if (!Object.keys(req.body).every((k) => ['mode', 'vertical', ...keys].includes(k))) return res.status(400).json({ error: 'unknown_field', detail: 'the body carries a field the lab does not take' });
         const vertical = verticalOf(req);
-        const r = runAction({ ws: id, workspaces, vertical, cast: castFor(req), op, params: params(req), traceparent: req.headers.traceparent, route: { method: method.toUpperCase(), url: `/api${route}` } });
+        if (mode === 'privilege' && !privilegeWorld) return res.status(409).json({ error: 'privilege_not_loaded', detail: 'switch to Real again to load the live Privilege inventory' });
+        const r = runAction({ ws: id, workspaces, vertical, cast: castFor(req), op, params: params(req), traceparent: req.headers.traceparent, route: { method: method.toUpperCase(), url: `/api${route}` }, privilegeWorld: mode === 'privilege' ? privilegeWorld : null });
         res.set('traceparent', r.traceparent);
         const common = { workspace: id, mode, vertical, hops: r.hops, hopsTruncated: r.hopsTruncated, traceId: r.traceId, state: r.state };
         if (r.outcome.ok) return res.json({ ok: true, result: r.outcome.result, ...common });

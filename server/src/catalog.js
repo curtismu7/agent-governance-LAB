@@ -43,6 +43,8 @@ export const SCOPES = [
   { id: 'org-lab-001', label: 'Salesforce org org-lab-001', cloud: 'saas', ou: null, reach: 'public', latent: false },
   { id: 'ws-lab-001', label: 'Databricks workspace ws-lab-001', cloud: 'saas', ou: null, reach: 'public', latent: false },
   { id: 'acct-lab-001', label: 'Snowflake account acct-lab-001', cloud: 'saas', ou: null, reach: 'public', latent: false },
+  // Real mode only: the live Privilege tenant, reached through the local console API. Never populated by the seeded world.
+  { id: 'privilege-tenant', label: 'Privilege tenant (live console)', cloud: 'privilege', ou: null, reach: 'public', latent: false },
 ];
 export const SCOPE = Object.fromEntries(SCOPES.map((s) => [s.id, s]));
 export const SCOPE_IDS = SCOPES.map((s) => s.id);

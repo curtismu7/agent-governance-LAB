@@ -1,5 +1,6 @@
-// The glue between the HTTP layer and the engine: Mock reads tables, Live drives the workspace's engine. Every action gets one W3C
-// trace and a list of hops (the raw request and response panes), with anything credential-shaped masked.
+// The glue between the HTTP layer and the engine: Mock reads tables, Live drives the workspace's engine, Privilege (Real) drives an
+// engine over the LIVE Privilege tenant. Every action gets one W3C trace and a list of hops (the raw request and response panes), with
+// anything credential-shaped masked.
 import { Engine } from './engine.js';
 import { perform } from './actions.js';
 import { cleanFree } from './credentials.js';
@@ -44,9 +45,16 @@ export function liveState(ws, workspaces, vertical, cast) {
   return e.snapshot();
 }
 
+// Privilege (Real) state: the workspace's engine over the live Privilege tenant (one mapped world per workspace, like Live).
+export function privilegeState(ws, workspaces, vertical, cast, privilegeWorld) {
+  const e = workspaces.peek(ws, `${vertical}#priv`) || new Engine(cast, privilegeWorld);
+  return e.snapshot();
+}
+
 // Runs one engine action for a workspace with a trace. Returns { outcome, hops, traceparent, state }.
-export function runAction({ ws, workspaces, vertical, cast, op, params, traceparent, route }) {
-  const e = workspaces.engine(ws, vertical, cast);
+export function runAction({ ws, workspaces, vertical, cast, op, params, traceparent, route, privilegeWorld = null }) {
+  const key = privilegeWorld ? `${vertical}#priv` : vertical;
+  const e = privilegeWorld ? (workspaces.peek(ws, key) || new Engine(cast, privilegeWorld)) : workspaces.engine(ws, vertical, cast);
   const t = newTrace(traceparent);
   const root = t.span();
   e.trace = { traceId: t.traceId, span: t.span }; e.hops = []; e.hopsTruncated = false;

@@ -27,6 +27,7 @@ test('health, info and story answer; the story fills every token for every verti
 });
 
 test('rule 19: POST /api/mode takes exactly {source: mock|real}, holds the mode server-side, and /api/info reports it', async () => {
+  // AGL_PRIV_* unset: Real resolves to the loopback live engine (with settings it is the privilege mode; see privilege.test.js).
   await withServer(async (url) => {
     let info = await json(await get(url, '/api/info'));
     assert.equal(info.source, 'mock'); assert.equal(info.mode, 'mock'); assert.equal(info.realAvailable, true);

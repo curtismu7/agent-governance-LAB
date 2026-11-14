@@ -4,6 +4,7 @@
 // One Engine per workspace and vertical. No I/O, no randomness, no network, no clock: with the same calls it gives the same state. The Mock tables are generated from it.
 // Every writer is synchronous, so a check and its change can never interleave with another request (check-and-add is atomic per engine).
 import { SOURCES, SOURCE, SCOPES, SCOPE, OUS, OU_IDS, MODELS, TAG_KEYS, RECONFIGURE_FIELDS, DEFAULT_ONBOARDED_OUS, ORG_ID, PRIVATE_NETWORK_SOURCES, seedAgents } from './catalog.js';
+import { PRIVILEGE_SOURCE_ID, PRIVILEGE_SOURCE } from './privilegeMap.js';
 import { FINDINGS, assess, buildContext, levelOf } from './findings.js';
 import { seedGateways, seedOrphanEngines, metadata, scorecard, gatewayAction } from './gateway.js';
 import { buildRoster } from './cast.js';
@@ -37,22 +38,25 @@ const free = (value, max, what) => {
 };
 
 export class Engine {
-  constructor(cast) {
+  // `privilege` (optional): live Privilege data mapped by privilegeMap.js — { agents, gateways }. When given, the engine's
+  // provider world IS the live tenant: the inventory, the findings and the gateway tab read real applications, keys and policies.
+  constructor(cast, privilege = null) {
     this.cast = cast;
+    this.privilege = privilege;
     this.trace = null; this.hops = []; this.hopsTruncated = false;
     this.s = this.fresh();
-    this.runSync([], 'lab (initial scan)');
+    this.runSync([], privilege ? 'live Privilege (initial scan)' : 'lab (initial scan)');
   }
 
   fresh() {
-    const records = new Map(seedAgents(this.cast).map((a) => [a.id, a]));
+    const records = new Map((this.privilege ? this.privilege.agents : seedAgents(this.cast)).map((a) => [a.id, a]));
     return {
       seq: { audit: 0, proposal: 0, run: 0, campaign: 0, item: 0, conn: 0, poll: 0 },
       world: { records, present: new Set([...records.values()].filter((a) => !a.latent).map((a) => a.id)), released: false },
       agents: new Map(), people: new Map(buildRoster(this.cast).map((p) => [p.id, { ...p, departed: false }])),
       proposals: [], audit: [], refusals: [], dropped: { refusals: 0, runs: 0, polls: 0 }, runs: [], campaigns: [], onboardedOus: [...DEFAULT_ONBOARDED_OUS], accountsSeen: new Set(),
       privateNetwork: { tenantEnabled: false, connections: [], polls: [] },
-      gateways: seedGateways(this.cast), orphanEngines: seedOrphanEngines(),
+      gateways: this.privilege ? this.privilege.gateways : seedGateways(this.cast), orphanEngines: this.privilege ? [] : seedOrphanEngines(),
     };
   }
   reset() { this.s = this.fresh(); this.hops = []; this.runSync([], 'lab (initial scan)'); }
@@ -92,6 +96,7 @@ export class Engine {
   // ---------- discovery and the safe sync -----------------------------------------------------------------------------------------------------
   // Org enumeration: AWS member accounts of the lab's organization are listed and onboarded automatically, scoped by organizational unit.
   accountsView() {
+    if (this.privilege) return []; // the live Privilege tenant is not an AWS organization: no accounts to enumerate
     return SCOPES.filter((c) => c.cloud === 'aws' && (!c.latent || this.s.world.released)).map((c) => ({ id: c.id, ou: c.ou, label: c.label, status: this.s.onboardedOus.includes(c.ou) ? 'onboarded' : 'not-onboarded', reach: c.reach }));
   }
   connectionFor(scope, source) {
@@ -138,13 +143,14 @@ export class Engine {
     const pairs = new Map();
     for (const a of s.world.records.values()) {
       const sc = SCOPE[a.scope];
+      if (!sc) continue; // a scope this lab does not model (not possible in the seeded world; defensive for mapped data)
       if (sc.latent && !s.world.released) continue;
       if (sc.cloud === 'aws' && !s.onboardedOus.includes(sc.ou)) continue;
       pairs.set(`${a.source}|${a.scope}`, { source: a.source, scope: a.scope });
     }
     const seen = new Set();
     for (const part of pairs.values()) {
-      const sc = SCOPE[part.scope];
+      const sc = SCOPE[part.scope]; if (!sc) continue;
       const inj = failures.find((f) => f.source === part.source || f.scope === part.scope);
       const conn = sc.reach === 'private' ? this.connectionFor(part.scope, part.source) : null;
       const rec = { source: part.source, scope: part.scope, via: conn ? 'workload-scanner' : 'controller', status: 'ok', reason: null, seen: 0, discovered: 0 };
@@ -221,7 +227,7 @@ export class Engine {
   // ---------- proposals: propose -> admin approves or denies -> execute ---------------------------------------------------------------------------
   // `stored`: the params were validated and cleaned when the proposal was made (the execute-time re-check), so the tag value is not cleaned or length-checked twice.
   validateKind(a, kind, params, stored = false) {
-    const src = SOURCE[a.source];
+    const src = SOURCE[a.source] || (a.source === PRIVILEGE_SOURCE_ID ? PRIVILEGE_SOURCE : null);
     const keys = { delete: [], quarantine: [], 'strip-role': ['permissionId'], 'stop-flow': ['flowId'], 'disable-credential': ['credentialId'], retag: ['key', 'value'], reconfigure: ['field', 'value'], transfer: ['to'], 'revoke-access': [] }[kind];
     strictKeys(params, keys, 'the proposal');
     if (kind === 'delete') { need(src.delete, 'unsupported_on_source', 'delete is not supported on this source (the deck says Databricks is "in development")', 409); return {}; }
@@ -545,7 +551,7 @@ export class Engine {
       if (assessment.level >= 4) reasons.push('risk-high');
       if (a.status === 'unknown') reasons.push('status-unknown');
     }
-    const src = SOURCE[a.source];
+    const src = SOURCE[a.source] || (a.source === PRIVILEGE_SOURCE_ID ? PRIVILEGE_SOURCE : null);
     return {
       id: a.id, name: a.name, source: a.source, sourceName: src.name, scope: a.scope, scopeLabel: SCOPE[a.scope].label, model: a.model, modelDeprecated: Object.hasOwn(MODELS, a.model) && MODELS[a.model].deprecated,
       config: a.config, identity: { name: a.identity.name, kind: a.identity.kind, surface: src.surface, permissions: a.identity.permissions.map((p) => ({ ...p, inert: (a.quarantined || a.revoked || (p.viaCredential && !a.credentials.some((c) => c.id === p.viaCredential && c.enabled))) ? true : false })) },
@@ -570,7 +576,7 @@ export class Engine {
       summary: {
         total: agents.length, live: liveAgents.length,
         byStatus: Object.fromEntries(['active', 'unknown', 'gone', 'deleted'].map((k) => [k, agents.filter((a) => a.status === k).length])),
-        bySource: SOURCES.map((x) => ({ source: x.id, name: x.name, count: liveAgents.filter((a) => a.source === x.id).length })),
+        bySource: (this.privilege ? [{ id: PRIVILEGE_SOURCE_ID, name: 'PingOne Privilege (live)' }] : SOURCES).map((x) => ({ source: x.id, name: x.name, count: liveAgents.filter((a) => a.source === x.id).length })),
         byLevel, orphaned: liveAgents.filter((a) => a.actionRequired.includes('orphaned')).length,
         actionRequired: liveAgents.filter((a) => a.actionRequired.length).length, recentlyDiscovered: agents.filter((a) => a.discoveredAtRun === newest && newest > 0).map((a) => a.id),
         newestRun: newest, openProposals: s.proposals.filter((p) => OPEN.has(p.status)).length,

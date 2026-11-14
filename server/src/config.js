@@ -1,8 +1,9 @@
-// Deployment configuration. AGL_LAB_MODE is the DEFAULT mode the page opens in (mock or live); the header toggle can switch per visit.
-// Mock is the default. Both modes are loopback-only and make zero outbound calls. Anything else is an error, never a silent fallback.
+// Deployment configuration. AGL_LAB_MODE is the DEFAULT mode the page opens in (mock, live or privilege); the header toggle can switch per visit.
+// Mock is the default. Mock and Live are loopback-only and make zero outbound calls. Privilege (Real in the UI) reads the live PingOne
+// Privilege console and needs the AGL_PRIV_* settings; without them the Real toggle falls back to Live. Anything else is an error, never a silent fallback.
 // The one shared settings file (~/Development/.env, or STANDALONE_ENV) may carry AGL_LAB_MODE. A bare MODE is NOT read:
 // the shared file is read by every standalone app, and another app's MODE must not switch this one.
-export const MODES = ['mock', 'live'];
+export const MODES = ['mock', 'live', 'privilege'];
 export function modeFrom(env = process.env) {
   const raw = env.AGL_LAB_MODE;
   const m = raw === undefined || raw === '' ? 'mock' : raw;
