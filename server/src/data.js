@@ -8,6 +8,7 @@ export const INTRO = 'Agents created in cloud consoles sit outside identity proc
 export const BANNER = {
   mock: `SIMULATED, MOCK mode: tables generated from the lab's own governance engine and read-only. Every product claim is a ${CLAIM_LABEL} (release ${RELEASE}). No cloud account, provider API, gateway or tenant is touched. The inventory, findings, score and gateway shapes are the lab's own.`,
   live: `SIMULATED, LIVE mode: the lab's own local governance engine acts on your proposals, approvals, syncs and gateway changes, loopback only, zero outbound network. Every product claim is a ${CLAIM_LABEL} (release ${RELEASE}). No cloud account, provider API, gateway or tenant is touched.`,
+  privilege: `REAL mode, READ-ONLY: the inventory and the AgentCore gateway tab come from your live PingOne Privilege console (one fetch per switch, read-only GETs only; nothing is ever written to the tenant). Proposals, approvals, syncs and campaigns still run on the lab's own engine over that live data, and the lab's findings and score are still the lab's own. Every deck claim stays a ${CLAIM_LABEL} (release ${RELEASE}).`,
 };
 
 export const DECK_NUMBERS_TEXT = 'The deck\'s numbers: 13 sources, 46 findings, 5 levels (slide 45). The lab ships 13 sources, its own 13 illustrative findings and its own 5-level score.';

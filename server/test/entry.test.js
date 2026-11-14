@@ -21,7 +21,7 @@ test('no source file evals, uses vm or Function, builds a regular expression fro
     assert.ok(!/writeFile|appendFile|createWriteStream|mkdirSync|rmSync|unlinkSync/.test(code), `${f}: the server writes no file`);
     assert.ok(!/new RegExp\(/.test(code), `${f}: no regular expression is built at run time`);
     assert.ok(!/process\.env\.MODE\b/.test(code), `${f}: a bare MODE is never read`);
-    assert.ok(!/child_process|node:http'|node:https|node:net'/.test(code.replace("from 'node:net'", '')) || f === 'netguard.js', `${f}: no network or process modules`);
+    assert.ok(!/child_process|node:http'|node:https|node:net'/.test(code.replace("from 'node:net'", '')) || ['netguard.js', 'privilegeClient.js'].includes(f), `${f}: no network or process modules (privilegeClient.js is the one sanctioned Real-mode client)`);
   }
 });
 

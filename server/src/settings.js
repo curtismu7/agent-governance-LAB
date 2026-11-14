@@ -6,7 +6,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseEnv } from 'node:util';
 
-export const SETTINGS_KEYS = ['AGL_LAB_MODE'];
+import { PRIV_SETTING_NAMES } from './privilegeConfig.js';
+
+export const SETTINGS_KEYS = ['AGL_LAB_MODE', ...PRIV_SETTING_NAMES];
 export const settingsPath = (env = process.env) => env.STANDALONE_ENV || path.join(os.homedir(), 'Development', '.env');
 
 export function readSharedSettings(file) {

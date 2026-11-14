@@ -27,7 +27,7 @@ export const TABS = [
 ];
 // The banner is never blank and never claims one mode before it knows: until the story answers it says both, honestly.
 const TAIL = "Every product claim is a Ping release claim, UNVERIFIED on our tenant (release 2026-11-02). Nothing here calls a real cloud, provider API, gateway or tenant.";
-export const BANNER_UNKNOWN = `SIMULATED, MOCK or LIVE mode (loopback only, no outbound network). ${TAIL}`;
+export const BANNER_UNKNOWN = `SIMULATED, MOCK, LIVE or REAL mode. ${TAIL}`;
 const WRITE_TABS = ["inventory", "ownership", "sync", "gateway", "private"];
 
 const tabFromHash = () => { const h = window.location.hash.replace("#", ""); return TABS.some((t) => t.id === h) ? h : "inventory"; };
@@ -75,11 +75,15 @@ export default function App() {
   // Rule 19: switching is a server call (POST /api/mode with exactly {source}), then the data reloads so the banner,
   // mode chip and every tab reflect the mode the server answered with.
   const [modeError, setModeError] = useState(null);
+  const [realNote, setRealNote] = useState(null);
+  const [realFetched, setRealFetched] = useState(null);
   const setMode = async (m) => {
     setModeError(null);
     const r = await postJson("/api/mode", { source: m === "real" ? "real" : "mock" });
     if (!r.ok) { setModeError(r.body?.detail || r.body?.error || `HTTP ${r.status}`); return; }
     setModeState(r.body?.mode || m);
+    setRealNote(r.body?.note === "real_without_privilege_settings" ? "Real opened as the local engine: the Privilege settings are missing or not usable." : null);
+    setRealFetched(r.body?.fetchedAt || null);
     await lab.reload();
   };
   const select = (id) => { setTab(id); try { window.history.replaceState(null, "", `#${id}`); } catch { /* ignore */ } };
@@ -120,15 +124,17 @@ export default function App() {
   const roster = lab.state?.roster || [];
   // The acting user: the visitor's pick if it is still in the roster, else the first administrator.
   const actor = roster.some((p) => p.id === actorChoice) ? actorChoice : (roster.find((p) => p.role === "admin")?.id || "");
-  const banner = story && mode ? story.banner[mode] : BANNER_UNKNOWN;
+  const banner = story && mode ? (story.banner[mode] || BANNER_UNKNOWN) : BANNER_UNKNOWN;
   const ready = story && mode;
   const props = { story, mode, vertical, lab, actor };
   return (
     <div className={`app${presenter ? " app--presenter" : ""}`}>
       <header>
-        <p className="banner" role="status" data-state={mode === "live" ? "live" : "mock"} data-testid="banner">{banner}</p>
+        <p className="banner" role="status" data-state={mode === "privilege" ? "real" : mode === "live" ? "live" : "mock"} data-testid="banner">{banner}</p>
         <ReturnLink app="agent-governance-lab" />
         {modeError && <p className="app-error" role="alert" data-testid="mode-error">{modeError}</p>}
+        {realNote && !modeError && <p className="muted" data-testid="real-note">{realNote}</p>}
+        {mode === "privilege" && realFetched && <p className="muted" data-testid="real-fetched">Live Privilege inventory fetched at {realFetched} (read-only).</p>}
         <div className="head">
           <div>
             <h1 className="head__title">Agent Governance LAB</h1>
@@ -148,7 +154,7 @@ export default function App() {
             >
               <ShelfLink />
             </TopMenu>
-            <span className="chip" data-testid="mode">Mode: {mode || "..."}{mode === "live" ? " (local engine, loopback)" : mode === "mock" ? " (tables)" : ""}</span>
+            <span className="chip" data-testid="mode">Mode: {mode || "..."}{mode === "privilege" ? " (live Privilege, read-only)" : mode === "live" ? " (local engine, loopback)" : mode === "mock" ? " (tables)" : ""}</span>
             {!presenter && mode === "live" && roster.length > 0 && (
               <label className="inline">Act as{" "}
                 <select value={actor} onChange={(e) => setActor(e.target.value)} data-testid="actor">

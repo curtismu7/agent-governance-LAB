@@ -1,11 +1,22 @@
-// Runtime netguard: zero real outbound. Every non-loopback socket, DNS lookup, fetch and UDP send is refused and recorded.
-// The mock authorization server is in-process, so nothing in this app has a reason to leave the machine.
+// Runtime netguard. Mock and Live: zero real outbound (every non-loopback socket, DNS lookup, fetch and UDP send is refused and recorded).
+// Privilege (Real in the UI, owner rule 2026-11-14): setAllowedHosts([console host]) lets ONLY that name through (plus loopback,
+// which the server itself needs); everything else is still refused and recorded. Switching back to Mock or Live empties the list,
+// which closes the door. The Privilege client additionally pins each request to the configured origin (privilegeClient.js).
 import dns from 'node:dns';
 import net from 'node:net';
 import dgram from 'node:dgram';
 import { isLoopbackHost } from './safety.js';
 
 let active = null;
+const allowed = new Set(); // host names Privilege mode may reach, lower-case, no port
+const hostOk = (h) => isLoopbackHost(h) || allowed.has(String(h).toLowerCase().replace(/^\[|\]$/g, ''));
+
+// Replace the allowed outbound hosts (loopback is always allowed). Pass [] to close the door.
+export function setAllowedHosts(hosts = []) {
+  allowed.clear();
+  for (const h of hosts) if (typeof h === 'string' && h) allowed.add(h.toLowerCase().replace(/^\[|\]$/g, ''));
+}
+export const allowedHosts = () => [...allowed];
 
 export function installNetguard() {
   if (active) return active;
@@ -19,7 +30,7 @@ export function installNetguard() {
   const savedResolvers = [];
   const blockedResolver = (label, name, target) => function guardedResolve(host, ...rest) {
     const h = String(host);
-    if (isLoopbackHost(h)) return target.apply(this, [host, ...rest]);
+    if (hostOk(h)) return target.apply(this, [host, ...rest]);
     attempts.push(`dns:${h}`);
     const err = new Error(`network blocked: ${h}`);
     const cb = rest.find((r) => typeof r === 'function');
@@ -44,13 +55,13 @@ export function installNetguard() {
   };
   net.Socket.prototype.connect = function guardedConnect(...args) {
     const host = hostOf(args);
-    if (!isLoopbackHost(host)) { attempts.push(`socket:${host}`); throw new Error(`network blocked: ${host}`); }
+    if (!hostOk(host)) { attempts.push(`socket:${host}`); throw new Error(`network blocked: ${host}`); }
     return real.connect.apply(this, args);
   };
   dns.lookup = function guardedLookup(host, ...rest) {
     // listen() resolves its bind address through lookup. A wildcard bind (the container's AREG_BIND=0.0.0.0) is not outbound,
     // and connecting to it is still refused by the socket guard above, so only the lookup is allowed.
-    if (!isLoopbackHost(host) && host !== '0.0.0.0' && host !== '::') {
+    if (!hostOk(host) && host !== '0.0.0.0' && host !== '::') {
       attempts.push(`dns:${host}`);
       const cb = rest.find((r) => typeof r === 'function');
       return cb?.(new Error(`network blocked: ${host}`));
@@ -58,12 +69,12 @@ export function installNetguard() {
     return real.lookup.call(dns, host, ...rest);
   };
   dns.promises.lookup = async function guardedPromiseLookup(host, ...rest) {
-    if (!isLoopbackHost(host) && host !== '0.0.0.0' && host !== '::') { attempts.push(`dns:${host}`); throw new Error(`network blocked: ${host}`); }
+    if (!hostOk(host) && host !== '0.0.0.0' && host !== '::') { attempts.push(`dns:${host}`); throw new Error(`network blocked: ${host}`); }
     return real.plookup.call(dns.promises, host, ...rest);
   };
   globalThis.fetch = async function guardedFetch(input, init) {
     const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
-    if (!isLoopbackHost(url.hostname)) { attempts.push(`fetch:${url.hostname}`); throw new Error(`network blocked: ${url.hostname}`); }
+    if (!hostOk(url.hostname)) { attempts.push(`fetch:${url.hostname}`); throw new Error(`network blocked: ${url.hostname}`); }
     return real.fetch(input, init);
   };
   dgram.Socket.prototype.send = function guardedSend(...args) {
@@ -71,7 +82,7 @@ export function installNetguard() {
     const rest = args.slice(1);
     const addr = typeof rest[1] === 'number' ? rest[3] : rest[1];
     // No address means Node's own loopback default (an unconnected socket); a non-string, non-function address is refused.
-    const ok = addr === undefined || typeof addr === 'function' || (typeof addr === 'string' && isLoopbackHost(addr));
+    const ok = addr === undefined || typeof addr === 'function' || (typeof addr === 'string' && hostOk(addr));
     if (!ok) { attempts.push(`udp:${addr}`); throw new Error(`network blocked: ${addr}`); }
     return real.send.apply(this, args);
   };
