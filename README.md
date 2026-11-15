@@ -134,3 +134,14 @@ On Node 26: 297 tests pass (236 server, 38 web, 23 scripts).
 ## Not done
 
 No SE k8s build (deferred by the owner, 2026-10-31). Every product claim stays UNVERIFIED until it is measured on a tenant that has the release. The two unnamed quarantine sources (the lab models seven, not nine), the cut-off safe-sync line, the Risk Scoring discrepancy and the gateway JSON shapes remain open questions the deck and the schema do not answer.
+
+---
+
+## Real mode: what this lab uses in PingOne Privilege
+
+Real (Privilege) mode reads the live **PingOne Privilege console REST API** — the tenant's
+Agentic Apps, their policies and the agent inventory — with the console's "For Developers"
+key/secret pair: `AGL_PRIV_CONSOLE_URL`, `AGL_PRIV_TENANT`, `AGL_PRIV_API_KEY`,
+`AGL_PRIV_API_SECRET` (+ optional `AGL_PRIV_CA`) in the shared settings file. The netguard's
+allowlist is exactly the console's one origin; the key and secret are write-only and redacted
+from every error.
