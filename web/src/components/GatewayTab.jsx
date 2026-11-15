@@ -2,6 +2,8 @@ import { useState } from "react";
 import { visible } from "../safeText";
 import { ClaimTag, FieldSources, Json, Outcome, SourceTag, StatusTag } from "./Bits";
 
+// Keys that matter in the gateway payloads: who may call, whether a route around the gateway is open, and the enforcement mode.
+const GW_HOT = ["decision", "principal", "bypassOnly", "gatewayMediated", "bypassOpen", "mode", "wafFailureMode"];
 const NINE = ["GatewayDetailJSON", "GatewayEnginesJSON", "GatewayScorecardJSON", "GatewayBypassPostureJSON", "GatewayCallerAccessJSON", "RuntimeCallerAccessJSON", "BypassDiffJSON", "TargetCallerAccessJSON", "Truncated"];
 
 // Governing the AgentCore gateway itself (slides 35 and 45): the gateway is an object of policy, not just a route. Every change is an administrator action with an audit entry;
@@ -67,7 +69,7 @@ export default function GatewayTab({ story, lab, actor }) {
         {bypass && (
           <div data-testid="bypass-diff">
             <h4>Bypass diff for {bypass.runtime}: before and after</h4>
-            <div className="cols"><div><p className="muted">Before</p><Json value={bypass.bypassDiff.before} label="bypass diff before" /></div><div><p className="muted">After</p><Json value={bypass.bypassDiff.after} label="bypass diff after" /></div></div>
+            <div className="cols"><div><p className="muted">Before</p><Json value={bypass.bypassDiff.before} label="bypass diff before" hot={GW_HOT} /></div><div><p className="muted">After</p><Json value={bypass.bypassDiff.after} label="bypass diff after" hot={GW_HOT} /></div></div>
             <p>Principals whose only path was the bypass route and who now have none: {bypass.lockedOut.length ? bypass.lockedOut.map(visible).join(", ") : "none"}.</p>
           </div>
         )}
@@ -87,7 +89,7 @@ export default function GatewayTab({ story, lab, actor }) {
       <section className="panel" aria-label="Account metadata" data-testid="metadata">
         <h3 className="panel__sub">modelAgentCoreAccountMetadata <SourceTag source="swagger" /> <SourceTag source="invented" label="inner shapes lab-invented (the schema gives only the field name)" /></h3>
         <p className="muted">The nine fields below are the ones the console swagger added between 2026-10-26 and 2026-10-31 (schema only); the definition has 30 fields in all, and the 21 others are not modelled. In the real schema each is a string of JSON text; the shapes shown here are the lab's own and are computed from the gateway state above. Truncated: <strong data-testid="truncated">{String(s.agentCore.Truncated)}</strong> (computed from the size of the snapshot against a lab-invented limit).</p>
-        {NINE.filter((k) => k !== "Truncated").map((k) => <details key={k}><summary>{k}</summary><Json value={s.agentCore[k]} label={k} /></details>)}
+        {NINE.filter((k) => k !== "Truncated").map((k) => <details key={k}><summary>{k}</summary><Json value={s.agentCore[k]} label={k} hot={GW_HOT} /></details>)}
       </section>
       <FieldSources fields={story.fieldSources.filter((f) => /Gateway|gateway/.test(f.field))} />
     </div>
