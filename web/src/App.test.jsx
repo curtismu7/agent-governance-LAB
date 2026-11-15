@@ -8,6 +8,7 @@ import { createHealth } from "../../server/src/health.js";
 import { VERTICALS } from "../../server/src/cast.js";
 import App, { BANNER_UNKNOWN, TABS } from "./App";
 import { labelOffsets } from "./components/PatternDiagram";
+import { setJsonView } from "./components/JsonPane";
 import { visible } from "./safeText";
 import { forgetWorkspace } from "./workspace";
 
@@ -30,7 +31,7 @@ beforeAll(async () => {
   };
 });
 afterAll(async () => { globalThis.fetch = realFetch; await new Promise((r) => server.close(r)); });
-beforeEach(async () => { cleanup(); forgetWorkspace(); seen = []; gate = () => null; consumed = []; try { window.localStorage.clear(); window.sessionStorage.clear(); } catch { /* ignore */ } window.location.hash = ""; // rule 19: the server holds the mode now, so every test starts from mock
+beforeEach(async () => { cleanup(); forgetWorkspace(); seen = []; gate = () => null; consumed = []; try { window.localStorage.clear(); window.sessionStorage.clear(); } catch { /* ignore */ } setJsonView("form"); window.location.hash = ""; // rule 19: the server holds the mode now, so every test starts from mock
   await realFetch(`${base}/api/mode`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: JSON.stringify({ source: "mock" }) }); });
 
 const T = { timeout: 20000 };
@@ -282,10 +283,15 @@ describe("Ownership (Live): propose, approve, execute, and the refusals", () => 
     const needles = [secret, secret.slice(0, 30), "Tr0ub4dor", "Sup3rS3cretPw", "123-45-6789", "jane.doe", "4111 1111 1111"];
     for (const n of needles) expect(wholePageText()).not.toContain(n);
     expect(wholePageText()).toMatch(/\[masked:/);
-    // the collapsed hops <pre> is in the DOM too: open it and check the markup text and the raw HTML
+    // the collapsed hops are in the DOM too: open them and check the markup text and the raw HTML, in the Form view and in the JSON view (a <pre>)
     fireEvent.click(within(screen.getByTestId("hops")).getByText(/Raw hops/));
-    expect(screen.getByTestId("hops").querySelectorAll("pre").length).toBeGreaterThan(0);
-    for (const n of needles) { expect(wholePageText()).not.toContain(n); const c = document.body.cloneNode(true); c.querySelectorAll("textarea,input").forEach((x) => x.remove()); expect(c.innerHTML).not.toContain(n); }
+    const noNeedle = () => { for (const n of needles) { expect(wholePageText()).not.toContain(n); const c = document.body.cloneNode(true); c.querySelectorAll("textarea,input").forEach((x) => x.remove()); expect(c.innerHTML).not.toContain(n); } };
+    expect(screen.getByTestId("hops").querySelectorAll("pre").length).toBe(0);
+    expect(screen.getByTestId("hops").querySelectorAll(".json--form").length).toBeGreaterThan(0);
+    noNeedle();
+    act(() => setJsonView("raw"));
+    expect(screen.getByTestId("hops").querySelectorAll("pre.json--raw").length).toBeGreaterThan(0);
+    noNeedle();
     expect(seen.some((s) => s.body.includes(secret))).toBe(true); // it was sent, and never came back
   }, 60000);
 

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { visible } from "../safeText";
-import { AvailTag, ClaimTag, FieldSources, LevelTag, SourceTag, StatusTag } from "./Bits";
+import { AvailTag, ClaimTag, FieldSources, Json, LevelTag, SourceTag, StatusTag } from "./Bits";
 
 // Inventory / AI Platform Agents (slides 45 and 58): a cross-cloud inventory across thirteen sources, a dashboard (recently discovered, action required, platform filters)
 // and per-agent detail ("deep agent anatomy"). Mock reads a generated table; Live reads the workspace engine.
@@ -134,7 +134,7 @@ function AgentDetail({ a }) {
           <h4>Bindings</h4>{list(a.bindings, (b) => <li key={b.id}>{b.role}{b.roleExists ? "" : " (role missing)"}</li>)}
           <h4>Sub-agents</h4>{list(a.subAgents, (x) => <li key={x}>{x}</li>)}
           {a.flows.length > 0 && (<><h4>Flows</h4>{list(a.flows, (f) => <li key={f.id}>{f.name}{f.privileged ? " (privileged)" : ""}: {f.running ? "running" : "stopped"}</li>)}</>)}
-          {a.card && (<><h4>A2A agent card (Google Agent Registry)</h4><pre className="json" tabIndex={0} data-testid="agent-card">{visible(JSON.stringify(a.card, null, 2))}</pre></>)}
+          {a.card && (<><h4>A2A agent card (Google Agent Registry)</h4><Json value={a.card} label="A2A agent card" testId="agent-card" hot={["skills", "auth"]} /></>)}
         </div>
       </div>
     </section>

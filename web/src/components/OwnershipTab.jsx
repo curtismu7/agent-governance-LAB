@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { visible } from "../safeText";
-import { AvailTag, ClaimTag, FieldSources, Outcome, SourceTag, StatusTag } from "./Bits";
+import { AvailTag, ClaimTag, FieldSources, Json, Outcome, SourceTag, StatusTag } from "./Bits";
+
+// What matters in an audit entry: which proposal, which action, who approved it. One Form | JSON toggle per table is enough (the first row's); the choice applies to every pane on the page.
+const AUDIT_HOT = ["proposal", "proposalKind", "approvedBy"];
 
 const KIND_TEXT = {
   delete: "Delete the agent at the provider", quarantine: "Quarantine (detach the identity)", "strip-role": "Strip an over-privileged role", "stop-flow": "Stop a privileged flow", "disable-credential": "Disable a named credential",
@@ -80,9 +83,9 @@ export default function OwnershipTab({ story, lab, actor }) {
         <div className="scroll"><table className="tbl tbl--wide" data-testid="proposals">
           <thead><tr><th>Proposal</th><th>Agent</th><th>Action</th><th>By</th><th>Status</th><th>Decided by</th><th><span className="sr-only">Actions</span></th></tr></thead>
           <tbody>
-            {s.proposals.slice().reverse().map((p) => (
+            {s.proposals.slice().reverse().map((p, i) => (
               <tr key={p.id} data-testid={`proposal-${p.id}`}>
-                <td>{p.id}{p.succession ? " (succession)" : ""}</td><td><code>{visible(byId[p.agentId]?.name || p.agentId)}</code></td><td>{p.kind}{Object.keys(p.params).length ? ` ${visible(JSON.stringify(p.params))}` : ""}</td>
+                <td>{p.id}{p.succession ? " (succession)" : ""}</td><td><code>{visible(byId[p.agentId]?.name || p.agentId)}</code></td><td>{p.kind}{Object.keys(p.params).length > 0 && <Json value={p.params} label={`${p.id} parameters`} toggle={i === 0} />}</td>
                 <td>{visible(p.proposedBy)}</td><td><StatusTag status={p.status} /></td><td>{p.decidedBy ? visible(p.decidedBy) : "-"}</td>
                 <td>
                   {p.status === "proposed" && (<><button type="button" disabled={ro} onClick={() => decide(p.id, "approve")} data-testid={`approve-${p.id}`}>Approve</button> <button type="button" disabled={ro} onClick={() => decide(p.id, "deny")} data-testid={`deny-${p.id}`}>Deny</button></>)}
@@ -143,7 +146,7 @@ export default function OwnershipTab({ story, lab, actor }) {
         <p className="muted" data-testid="audit-note">The acting user is self-declared in this lab (there is no sign-in), so "audited" here does not mean authenticated. The log keeps every entry: {s.auditInfo.used} of {s.auditInfo.cap} used, and new work is refused (Reset) when fewer than {story.limits.auditMargin} are free. Refused attempts are kept in a separate ring of {s.auditInfo.refusalsCap}: {s.auditInfo.refusalsKept} kept, {s.auditInfo.refusalsDropped} dropped.</p>
         <div className="scroll"><table className="tbl tbl--wide">
           <thead><tr><th>#</th><th>Logical time</th><th>Kind</th><th>Acting user</th><th>Detail</th></tr></thead>
-          <tbody>{s.audit.slice(-25).reverse().map((a) => { const { n, at, kind, actor: who, ...rest } = a; return <tr key={n}><td>{n}</td><td>{at.slice(11, 16)}</td><td>{kind}</td><td>{visible(who)}</td><td>{visible(JSON.stringify(rest))}</td></tr>; })}</tbody>
+          <tbody>{s.audit.slice(-25).reverse().map((a, i) => { const { n, at, kind, actor: who, ...rest } = a; return <tr key={n}><td>{n}</td><td>{at.slice(11, 16)}</td><td>{kind}</td><td>{visible(who)}</td><td><Json value={rest} label={`audit entry ${n}`} hot={AUDIT_HOT} toggle={i === 0} /></td></tr>; })}</tbody>
         </table></div>
       </section>
       <FieldSources fields={story.fieldSources.filter((f) => /custodian|Remediation|Succession|Certification|approval|Targeted/i.test(f.field))} />
