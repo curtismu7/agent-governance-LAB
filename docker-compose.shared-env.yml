@@ -1,0 +1,14 @@
+# Optional overlay: give the container the one shared settings file (~/Development/.env), read-only, so
+# settings.js finds it at STANDALONE_ENV and the Privilege (Real) mode gets the AGL_PRIV_* console keys.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.shared-env.yml up -d
+services:
+  agent-governance-lab:
+    environment:
+      STANDALONE_ENV: /run/standalone.env
+    volumes:
+      - type: bind
+        source: ${STANDALONE_ENV:-${HOME}/Development/.env}
+        target: /run/standalone.env
+        read_only: true
+        bind:
+          create_host_path: false
