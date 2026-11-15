@@ -11,6 +11,7 @@ import LastAction from "./components/LastAction";
 import useLab from "./hooks/useLab";
 import { getJson, postJson, resetWorkspace } from "./api";
 import ShelfLink from "./components/ShelfLink";
+import VerifyMark from "./components/VerifyMark.jsx";
 import TopMenu, { applyFontSize } from "./top-menu/TopMenu.jsx";
 // Opened from Customer Agent LAB (UC-NHI1 routes here): strip + header Back only; no tab or vertical is preselected.
 import ReturnLink from "./return-link/ReturnLink.jsx";
@@ -153,6 +154,7 @@ export default function App() {
               onReset={reset}
             >
               <ShelfLink />
+              <VerifyMark id="agent-governance-lab" />
             </TopMenu>
             <span className="chip" data-testid="mode">Mode: {mode || "..."}{mode === "privilege" ? " (live Privilege, read-only)" : mode === "live" ? " (local engine, loopback)" : mode === "mock" ? " (tables)" : ""}</span>
             {!presenter && mode === "live" && roster.length > 0 && (
