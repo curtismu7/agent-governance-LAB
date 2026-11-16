@@ -63,7 +63,7 @@ export default function PrivateTab({ story, lab, actor }) {
         <p>Poll log: <strong data-testid="outbound">{pn.connector.outbound}</strong> outbound, <strong data-testid="inbound">{pn.connector.inbound}</strong> inbound. <span className="muted">Counted from the simulated log below. The log is outbound by construction in the lab's model, so this illustrates the deck's claim; it is not proof about the product.</span></p>
         <div className="seg">
           <button type="button" disabled={ro || lab.busy} onClick={poll} data-testid="poll">Run a connector poll</button>
-          <button type="button" className="primary" disabled={ro || lab.busy} onClick={sync} data-testid="scan">Run a sync (the scanner scans)</button>
+          <button type="button" disabled={ro || lab.busy} onClick={sync} data-testid="scan">Run a sync (the scanner scans)</button>
         </div>
         <Outcome last={lab.last} prefix="/connector" />
         <p className="muted" data-testid="polls-note">The poll log keeps the newest {story.limits.polls} polls; {s.auditInfo.pollsDropped} older ones have been dropped from it.</p>

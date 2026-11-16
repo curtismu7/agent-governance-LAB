@@ -44,7 +44,7 @@ export default function GatewayTab({ story, lab, actor }) {
         <p className="muted">Flipping the policy engine to ENFORCE, or the WAF to fail-closed, needs the gateway name typed exactly: <code>{visible(gw.name)}</code>. The deck names the typed confirmation for the enforcing flip; for fail-closed it is the lab's reading. A wrong text changes nothing.</p>
         <label>Type the gateway name to confirm<input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck="false" data-testid="typed" /></label>
         <div className="seg">
-          <button type="button" disabled={ro || lab.busy} onClick={() => go({ kind: "set-enforcement", mode: "ENFORCE", confirm: typed })} data-testid="to-enforce">Flip to ENFORCE</button>
+          <button type="button" className="primary" disabled={ro || lab.busy} onClick={() => go({ kind: "set-enforcement", mode: "ENFORCE", confirm: typed })} data-testid="to-enforce">Flip to ENFORCE</button>
           <button type="button" disabled={ro || lab.busy} onClick={() => go({ kind: "set-enforcement", mode: "LOG_ONLY" })} data-testid="to-logonly">Back to LOG_ONLY</button>
           <button type="button" disabled={ro || lab.busy} onClick={() => go({ kind: "set-waf", mode: "fail-closed", confirm: typed })} data-testid="to-closed">WAF: fail closed</button>
           <button type="button" disabled={ro || lab.busy} onClick={() => go({ kind: "set-waf", mode: "fail-open" })} data-testid="to-open">WAF: fail open</button>

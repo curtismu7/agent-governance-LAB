@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import InventoryTab from "./components/InventoryTab";
 import ReviewTab from "./components/ReviewTab";
 import OwnershipTab from "./components/OwnershipTab";
@@ -50,7 +50,6 @@ export default function App() {
   const [actorChoice, setActor] = useState("");
   const [theme, setTheme] = useState(savedTheme);
   const [fontStep, setFontStep] = useState(savedFont);
-  const tabsRef = useRef(null);
   const lab = useLab({ mode, vertical, scenario: scenarioId });
 
   useEffect(() => { getJson("/api/info").then((i) => { setInfo(i); setModeState((m) => m || i.mode || i.source); }, () => setModeState((m) => m || "mock")); }, []);
@@ -89,14 +88,6 @@ export default function App() {
   };
   const select = (id) => { setTab(id); try { window.history.replaceState(null, "", `#${id}`); } catch { /* ignore */ } };
 
-  // Keep the active tab fully in view in the scrolling tab strip (375px).
-  useEffect(() => {
-    const strip = tabsRef.current; const el = document.getElementById(`tab-${tab}`);
-    if (!strip || !el) return;
-    const left = el.offsetLeft - strip.offsetLeft;
-    if (left < strip.scrollLeft || left + el.offsetWidth > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = Math.max(0, left - 8);
-  }, [tab]);
-
   useEffect(() => {
     const on = (e) => {
       if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
@@ -115,13 +106,6 @@ export default function App() {
     setResetMsg(ok ? "Reset: your workspace's inventory, proposals, audit trail, sync runs, campaign, private-network and gateway state are back to the start, and the diagram is back in place." : "Reset failed on the server; the view was reloaded.");
   }, [lab.reload]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const onKeyTab = (e, i) => {
-    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-    const next = TABS[(i + (e.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length];
-    select(next.id);
-    document.getElementById(`tab-${next.id}`)?.focus();
-  };
-
   const roster = lab.state?.roster || [];
   // The acting user: the visitor's pick if it is still in the roster, else the first administrator.
   const actor = roster.some((p) => p.id === actorChoice) ? actorChoice : (roster.find((p) => p.role === "admin")?.id || "");
@@ -130,34 +114,48 @@ export default function App() {
   const props = { story, mode, vertical, lab, actor };
   return (
     <div className={`app${presenter ? " app--presenter" : ""}`}>
-      <header>
+      <header className="shell-bar">
+        <span className="shell-brand">
+          <span className="shell-logo" aria-hidden="true">AG</span>
+          <h1>Agent Governance LAB</h1>
+          <span className={`shell-badge${mode && mode !== "mock" ? " shell-badge--real" : ""}`} data-testid="mode">
+            {mode === "privilege" ? "Real" : mode === "live" ? "Live" : mode === "mock" ? "Mock" : "..."}
+            <span className="sr-only">{mode === "privilege" ? " (live Privilege, read-only)" : mode === "live" ? " (local engine, loopback)" : mode === "mock" ? " (tables)" : ""}</span>
+          </span>
+        </span>
+        <nav className="shell-nav" aria-label="Lab sections">
+          {TABS.map((t) => (
+            <a key={t.id} href={`#${t.id}`} aria-current={tab === t.id ? "page" : undefined}
+              onClick={(e) => { e.preventDefault(); select(t.id); }}>{t.label}</a>
+          ))}
+        </nav>
+        <TopMenu
+          mode={{ value: mode === "live" ? "real" : "mock", onChange: setMode, realAvailable: true }}
+          vertical={{ value: vertical, onChange: setVertical, options: story ? story.verticals : ["finance"] }}
+          theme={{ value: theme, onChange: setTheme }}
+          fontSize={{ value: fontStep, onChange: setFontStep }}
+          present={{ active: presenter, onToggle: () => setPresenter((v) => !v), label: "Presenter (P)" }}
+          help={{ href: "https://github.com/curtismu7/agent-governance-LAB#readme" }}
+          version={info?.version || null}
+          onReset={reset}
+        >
+          <ShelfLink />
+          <VerifyMark id="agent-governance-lab" />
+          <ReturnLink app="agent-governance-lab" variant="header" />
+        </TopMenu>
+      </header>
+      <main className="page">
         <p className="banner" role="status" data-state={mode === "privilege" ? "real" : mode === "live" ? "live" : "mock"} data-testid="banner">{banner}</p>
         <ReturnLink app="agent-governance-lab" />
+        {(error || lab.error) && <p className="app-error" role="alert">Could not load the lab ({error || lab.error}). Is the server running?</p>}
         {modeError && <p className="app-error" role="alert" data-testid="mode-error">{modeError}</p>}
         {realNote && !modeError && <p className="muted" data-testid="real-note">{realNote}</p>}
         {mode === "privilege" && realFetched && <p className="muted" data-testid="real-fetched">Live Privilege inventory fetched at {realFetched} (read-only).</p>}
-        <div className="head">
-          <div>
-            <h1 className="head__title">Agent Governance LAB</h1>
-            {!presenter && story && <p className="head__intro">{story.intro}</p>}
-          </div>
-          <div className="head__tools">
-            <ReturnLink app="agent-governance-lab" variant="header" />
-            <TopMenu
-              mode={{ value: mode === "live" ? "real" : "mock", onChange: setMode, realAvailable: true }}
-              vertical={{ value: vertical, onChange: setVertical, options: story ? story.verticals : ["finance"] }}
-              theme={{ value: theme, onChange: setTheme }}
-              fontSize={{ value: fontStep, onChange: setFontStep }}
-              present={{ active: presenter, onToggle: () => setPresenter((v) => !v), label: "Presenter (P)" }}
-              help={{ href: "https://github.com/curtismu7/agent-governance-LAB#readme" }}
-              version={info?.version || null}
-              onReset={reset}
-            >
-              <ShelfLink />
-              <VerifyMark id="agent-governance-lab" />
-            </TopMenu>
-            <span className="chip" data-testid="mode">Mode: {mode || "..."}{mode === "privilege" ? " (live Privilege, read-only)" : mode === "live" ? " (local engine, loopback)" : mode === "mock" ? " (tables)" : ""}</span>
-            {!presenter && mode === "live" && roster.length > 0 && (
+        <p className="sr-only" role="status" aria-live="polite">{resetMsg}</p>
+        {!presenter && (story || (mode === "live" && roster.length > 0)) && (
+          <div className="page-head">
+            {story && <p className="head__intro">{story.intro}</p>}
+            {mode === "live" && roster.length > 0 && (
               <label className="inline">Act as{" "}
                 <select value={actor} onChange={(e) => setActor(e.target.value)} data-testid="actor">
                   {roster.map((p) => <option key={p.id} value={p.id}>{p.id} ({p.role}{p.departed ? ", left" : ""})</option>)}
@@ -165,18 +163,9 @@ export default function App() {
               </label>
             )}
           </div>
-        </div>
-      </header>
-      <main>
-        <p className="sr-only" role="status" aria-live="polite">{resetMsg}</p>
-        <div role="tablist" aria-label="Lab sections" className="tabs" ref={tabsRef}>
-          {TABS.map((t, i) => (
-            <button key={t.id} id={`tab-${t.id}`} role="tab" type="button" aria-selected={tab === t.id} aria-controls={`panel-${t.id}`} tabIndex={tab === t.id ? 0 : -1}
-              onClick={() => select(t.id)} onKeyDown={(e) => onKeyTab(e, i)}>{t.label}</button>
-          ))}
-        </div>
-        <div id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`}>
-          {error || lab.error ? <p className="app-error" role="alert">Could not load the lab ({error || lab.error}). Is the server running?</p> : !ready ? <p className="muted">Loading...</p> : (
+        )}
+        <div id={`panel-${tab}`}>
+          {error || lab.error ? null : !ready ? <p className="muted">Loading...</p> : (
             <>
               {mode === "mock" && lab.scenario && WRITE_TABS.includes(tab) && (
                 <p className="muted" data-testid="scenario-note">Showing the end of the scripted scenario "{lab.scenario.title}". Pick another on the Inventory tab, or switch to Live to act yourself. Mock only reads tables.</p>

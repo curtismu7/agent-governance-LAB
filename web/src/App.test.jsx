@@ -36,7 +36,8 @@ beforeEach(async () => { cleanup(); forgetWorkspace(); seen = []; gate = () => n
 
 const T = { timeout: 20000 };
 const mount = async () => { render(<App />); await screen.findByTestId("scenarios", {}, T); };
-const tab = (name) => userEvent.click(screen.getByRole("tab", { name }));
+const nav = () => within(screen.getByRole("navigation", { name: "Lab sections" }));
+const tab = (name) => userEvent.click(nav().getByRole("link", { name }));
 const click = (id) => userEvent.click(screen.getByTestId(id));
 const live = async () => { await userEvent.selectOptions(screen.getByTestId("mode-select"), "real"); await waitFor(() => expect(screen.getByTestId("banner")).toHaveTextContent(/LIVE mode/)); await screen.findByTestId("actor", {}, T); await waitFor(() => expect(screen.getByTestId("tile-live")).toHaveTextContent("23"), T); };
 const setValue = (id, value) => fireEvent.change(screen.getByTestId(id), { target: { value } });
@@ -59,7 +60,7 @@ describe("shell", () => {
   it("says it is simulated and UNVERIFIED on every tab, in presenter mode too, and shows the mode", async () => {
     await mount();
     expect(screen.getByTestId("banner")).toHaveTextContent(/MOCK mode/);
-    expect(screen.getByTestId("mode")).toHaveTextContent("Mode: mock");
+    expect(screen.getByTestId("mode")).toHaveTextContent("Mock (tables)");
     for (const t of TABS) {
       await tab(t.label);
       expect(screen.getByTestId("banner")).toHaveTextContent(/UNVERIFIED on our tenant/);
@@ -81,8 +82,8 @@ describe("shell", () => {
     await mount();
     for (const t of TABS) {
       await tab(t.label);
-      await userEvent.selectOptions(screen.getByTestId("mode-select"), "real"); await waitFor(() => expect(screen.getByTestId("banner")).toHaveTextContent(/LIVE mode/)); expect(screen.getByTestId("mode")).toHaveTextContent("Mode: live");
-      await userEvent.selectOptions(screen.getByTestId("mode-select"), "mock"); await waitFor(() => expect(screen.getByTestId("banner")).toHaveTextContent(/MOCK mode/)); expect(screen.getByTestId("mode")).toHaveTextContent("Mode: mock");
+      await userEvent.selectOptions(screen.getByTestId("mode-select"), "real"); await waitFor(() => expect(screen.getByTestId("banner")).toHaveTextContent(/LIVE mode/)); expect(screen.getByTestId("mode")).toHaveTextContent("Live (local engine, loopback)");
+      await userEvent.selectOptions(screen.getByTestId("mode-select"), "mock"); await waitFor(() => expect(screen.getByTestId("banner")).toHaveTextContent(/MOCK mode/)); expect(screen.getByTestId("mode")).toHaveTextContent("Mock (tables)");
     }
   });
 
@@ -93,12 +94,12 @@ describe("shell", () => {
     await waitFor(() => expect(screen.getByTestId("banner")).toHaveTextContent(/LIVE mode/), T);
     expect(seen.some((r) => r.url.endsWith("/api/mode") && r.body === JSON.stringify({ source: "real" }))).toBe(true);
     expect(seen.some((r) => r.url.includes("/api/state?"))).toBe(true);
-    expect(screen.getByTestId("mode")).toHaveTextContent("Mode: live");
+    expect(screen.getByTestId("mode")).toHaveTextContent("Live (local engine, loopback)");
     seen.length = 0;
     await userEvent.selectOptions(screen.getByTestId("mode-select"), "mock");
     await waitFor(() => expect(screen.getByTestId("banner")).toHaveTextContent(/MOCK mode/), T);
     expect(seen.some((r) => r.url.endsWith("/api/mode") && r.body === JSON.stringify({ source: "mock" }))).toBe(true);
-    expect(screen.getByTestId("mode")).toHaveTextContent("Mode: mock");
+    expect(screen.getByTestId("mode")).toHaveTextContent("Mock (tables)");
   });
 
   it("rule 19: the mode the server holds survives a reload, and a refused switch shows the server's reason", async () => {
@@ -115,14 +116,19 @@ describe("shell", () => {
     expect(j.detail).toMatch(/mock.*real|real/);
   });
 
-  it("arrow keys move between tabs, and the URL hash follows", async () => {
+  it("the shell-bar nav pills mark the current section, and the URL hash follows", async () => {
     await mount();
-    screen.getByRole("tab", { name: "Inventory" }).focus();
-    await userEvent.keyboard("{ArrowRight}");
-    expect(screen.getByRole("tab", { name: "Permission review" })).toHaveAttribute("aria-selected", "true");
+    expect(nav().getByRole("link", { name: "Inventory" })).toHaveAttribute("aria-current", "page");
+    await tab("Permission review");
+    expect(nav().getByRole("link", { name: "Permission review" })).toHaveAttribute("aria-current", "page");
+    expect(nav().getByRole("link", { name: "Inventory" })).not.toHaveAttribute("aria-current");
     expect(window.location.hash).toBe("#review");
-    await userEvent.keyboard("{ArrowLeft}{ArrowLeft}");
-    expect(screen.getByRole("tab", { name: "Talk track" })).toHaveAttribute("aria-selected", "true");
+    await tab("Talk track");
+    expect(nav().getByRole("link", { name: "Talk track" })).toHaveAttribute("aria-current", "page");
+    expect(window.location.hash).toBe("#talk");
+    expect(nav().getAllByRole("link").filter((a) => a.getAttribute("aria-current") === "page")).toHaveLength(1);
+    expect(document.querySelector("header.shell-bar h1")).toHaveTextContent("Agent Governance LAB"); // the one h1 is in the bar
+    expect(document.querySelector("main").firstElementChild).toBe(screen.getByTestId("banner")); // shell bar first, then main with the banner first
   });
 
   it("talks only to its own origin", async () => {
@@ -524,7 +530,7 @@ describe("stale answers", () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     // the stale answer carried the live engine after a second scan (26 agents): it must not replace the Mock table (23)
     expect(screen.getByTestId("tile-live")).toHaveTextContent("23");
-    expect(screen.getByTestId("mode")).toHaveTextContent("Mode: mock");
+    expect(screen.getByTestId("mode")).toHaveTextContent("Mock (tables)");
   }, 60000);
 });
 
