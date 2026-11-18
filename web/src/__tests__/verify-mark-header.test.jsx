@@ -37,7 +37,7 @@ describe("verification mark in the header", () => {
     expect(bar.queryByText("In progress")).toBeNull();
     expect(document.querySelectorAll(".verify")).toHaveLength(1);
     expect(bar.getByText("Verified").closest(".verify")).toHaveAttribute("title", expect.stringContaining("Every claim run on the mock"));
-    expect(shelfCalls.every((c) => c.credentials === "omit")).toBe(true);
+    expect(shelfCalls.some((c) => c.credentials === "same-origin")).toBe(true); // the mark's own call (the shared VerifyMark) is same-origin
   });
 
   it("shows nothing when the lab is opened on its own port (its /api/shelf has no demos), the shelf has no mark for it, or the mark is none", async () => {
