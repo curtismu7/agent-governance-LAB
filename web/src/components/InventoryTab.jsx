@@ -22,7 +22,7 @@ export default function InventoryTab({ story, mode, lab, actor, scenarioId, setS
   return (
     <div className="stack">
       <section className="panel" data-testid="intro-panel">
-        <h2 className="panel__title">Inventory: AI Platform Agents <ClaimTag /> <span className="tag" data-state="ok" data-testid="avail-tag">ENHANCED, GA (slide 45)</span></h2>
+        <h2 className="panel__title"><span className="step-num" data-n="1" aria-hidden="true"></span>Inventory: AI Platform Agents <ClaimTag /> <span className="tag" data-state="ok" data-testid="avail-tag">ENHANCED, GA (slide 45)</span></h2>
         <p className="muted">Thirteen sources, one inventory: every agent with its identity, model, configuration and owner. {story.deckNumbers.text}</p>
         {mode === "mock" && (
           <label className="inline">Scripted scenario{" "}
@@ -35,7 +35,7 @@ export default function InventoryTab({ story, mode, lab, actor, scenarioId, setS
       </section>
 
       <section className="panel" aria-label="Dashboard" data-testid="dashboard">
-        <h3 className="panel__sub">Dashboard</h3>
+        <h3 className="panel__sub"><span className="step-num" data-n="2" aria-hidden="true"></span>Dashboard</h3>
         <div className="tiles">
           <div className="tile"><div className="tile__n" data-testid="tile-live">{sum.live}</div><div className="tile__t">agents in the inventory</div></div>
           <div className="tile"><div className="tile__n" data-testid="tile-action">{sum.actionRequired}</div><div className="tile__t">action required</div></div>
@@ -58,7 +58,7 @@ export default function InventoryTab({ story, mode, lab, actor, scenarioId, setS
       </section>
 
       <section className="panel" aria-label="Agents">
-        <h3 className="panel__sub">Agents ({rows.length})</h3>
+        <h3 className="panel__sub"><span className="step-num" data-n="3" aria-hidden="true"></span>Agents ({rows.length})</h3>
         <div className="scroll"><table className="tbl tbl--wide" data-testid="agents">
           <thead><tr><th>Agent</th><th>Source</th><th>Scope</th><th>Model</th><th>Custodian</th><th>Status</th><th>Risk</th><th>Needs</th><th><span className="sr-only">Detail</span></th></tr></thead>
           <tbody>
@@ -80,7 +80,7 @@ export default function InventoryTab({ story, mode, lab, actor, scenarioId, setS
       {detail && <AgentDetail a={detail} />}
 
       <section className="panel" aria-label="AWS Organizations" data-testid="org-panel">
-        <h3 className="panel__sub">AWS Organizations: accounts enumerated and onboarded by organizational unit <SourceTag source="deck" /></h3>
+        <h3 className="panel__sub"><span className="step-num" data-n="4" aria-hidden="true"></span>AWS Organizations: accounts enumerated and onboarded by organizational unit <SourceTag source="deck" /></h3>
         <p className="muted">Organization {s.org.id} (fake). A new account in an onboarded unit is picked up at the next sync. {s.provider.released ? "The new account has appeared." : "A new account will appear before the second scan."}</p>
         <div className="seg" role="group" aria-label="Organizational units">
           {s.org.ous.map((o) => <button key={o.id} type="button" aria-pressed={s.org.onboardedOus.includes(o.id)} disabled={readOnly} onClick={() => toggleOu(o.id)} data-testid={`ou-${o.id}`}>{o.label}{s.org.onboardedOus.includes(o.id) ? ": onboarded" : ": not onboarded"}</button>)}
@@ -93,7 +93,7 @@ export default function InventoryTab({ story, mode, lab, actor, scenarioId, setS
       </section>
 
       <details data-testid="availability">
-        <summary>What is available, what is roadmap (slide 21)</summary>
+        <summary><span className="step-num" data-n="6" aria-hidden="true"></span>What is available, what is roadmap (slide 21)</summary>
         <div className="scroll"><table className="tbl tbl--wide">
           <thead><tr><th>Capability</th><th>Availability</th><th>What the lab does</th></tr></thead>
           <tbody>{story.availability.map((x) => <tr key={x.capability}><td>{x.capability}</td><td><AvailTag value={x.availability} /></td><td>{x.lab}</td></tr>)}</tbody>
@@ -108,7 +108,7 @@ function AgentDetail({ a }) {
   const list = (items, render) => (items.length ? <ul className="plain">{items.map(render)}</ul> : <p className="muted">none</p>);
   return (
     <section className="panel" aria-label={`Detail of ${a.name}`} data-testid="agent-detail">
-      <h3 className="panel__sub">Deep agent anatomy: <code>{visible(a.name)}</code> <SourceTag source="deck" label="deck claim (slides 45 and 58); record shape lab-invented" /></h3>
+      <h3 className="panel__sub"><span className="step-num" data-n="5" aria-hidden="true"></span>Deep agent anatomy: <code>{visible(a.name)}</code> <SourceTag source="deck" label="deck claim (slides 45 and 58); record shape lab-invented" /></h3>
       <div className="cols">
         <div>
           <h4>Identity and configuration</h4>
