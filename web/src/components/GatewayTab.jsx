@@ -2,8 +2,8 @@ import { useState } from "react";
 import { visible } from "../safeText";
 import { ClaimTag, FieldSources, Json, Outcome, SourceTag, StatusTag } from "./Bits";
 
-// Keys that matter in the gateway payloads: who may call, whether a route around the gateway is open, and the enforcement mode.
-const GW_HOT = ["decision", "principal", "bypassOnly", "gatewayMediated", "bypassOpen", "mode", "wafFailureMode"];
+// Keys that matter in the gateway payloads: the allow/deny decision, whether a route around the gateway is open, and the enforcement mode.
+const GW_HOT = ["decision", "mode", "bypassOpen"];
 const NINE = ["GatewayDetailJSON", "GatewayEnginesJSON", "GatewayScorecardJSON", "GatewayBypassPostureJSON", "GatewayCallerAccessJSON", "RuntimeCallerAccessJSON", "BypassDiffJSON", "TargetCallerAccessJSON", "Truncated"];
 
 // Governing the AgentCore gateway itself (slides 35 and 45): the gateway is an object of policy, not just a route. Every change is an administrator action with an audit entry;
